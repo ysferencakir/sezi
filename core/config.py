@@ -8,6 +8,11 @@ class Settings(BaseSettings):
     ntfy_url: str = "https://ntfy.sh"
     ntfy_topic: str = ""
     ntfy_token: str = ""  # boş bırakılırsa auth olmadan gönderir
+    # Google OAuth2
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:8000/auth/google/callback"
+
     app_env: str = "development"
     log_level: str = "INFO"
 

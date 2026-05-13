@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException
 from loguru import logger
 from pydantic import BaseModel
 
+from api.routers import auth
 from core import module_loader, scheduler
 from core.database import create_tables
 
@@ -18,6 +19,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Sezi", version="0.1.0", lifespan=lifespan)
+app.include_router(auth.router)
 
 
 class ModuleInfo(BaseModel):
