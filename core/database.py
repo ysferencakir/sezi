@@ -6,7 +6,10 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from core.config import settings
 
-engine = create_async_engine(settings.database_url, echo=settings.is_dev)
+# asyncpg sslmode query parametresini desteklemez; URL'den çıkarıp connect_args'a taşıyoruz
+_db_url = settings.database_url.replace("?sslmode=require", "").replace("&sslmode=require", "")
+_connect_args = {"ssl": "require"} if "neon.tech" in settings.database_url else {}
+engine = create_async_engine(_db_url, echo=settings.is_dev, connect_args=_connect_args)
 AsyncSessionFactory = async_sessionmaker(engine, expire_on_commit=False)
 
 
