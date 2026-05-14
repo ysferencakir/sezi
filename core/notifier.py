@@ -1,70 +1,35 @@
-from abc import ABC, abstractmethod
-
+import asyncio
 from loguru import logger
 
 from core.config import settings
 
 
-class NotificationChannel(ABC):
-    @abstractmethod
-    async def send(self, message: str, title: str = "Sezi") -> None: ...
-
-
-class NtfyChannel(NotificationChannel):
-    """
-    ntfy.sh push notifications.
-    Daha fazla bilgi: https://ntfy.sh/docs/publish/
-    """
-
-    def __init__(self, url: str, topic: str, token: str = "") -> None:
-        self._url = url.rstrip("/")
-        self._topic = topic
-        self._token = token
+class Notifier:
+    """Send notifications via ntfy.sh and optional Telegram."""
 
     async def send(self, message: str, title: str = "Sezi") -> None:
-        if not self._topic:
-            logger.warning("NTFY_TOPIC ayarlanmamış, bildirim atlandı")
+        """Send notification to ntfy.sh topic."""
+        if not settings.ntfy_topic:
+            logger.info(f"[{title}] {message} (ntfy.sh disabled)")
             return
 
-        import httpx
+        try:
+            import httpx
+            
+            headers = {"Title": title}
+            if settings.ntfy_token:
+                headers["Authorization"] = f"Bearer {settings.ntfy_token}"
 
-        headers = {"Title": title, "Content-Type": "text/plain; charset=utf-8"}
-        if self._token:
-            headers["Authorization"] = f"Bearer {self._token}"
-
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f"{self._url}/{self._topic}",
-                content=message.encode("utf-8"),
-                headers=headers,
-            )
-            resp.raise_for_status()
-
-
-class LogChannel(NotificationChannel):
-    """Fallback: bildirimi sadece loglar."""
-
-    async def send(self, message: str, title: str = "Sezi") -> None:
-        logger.info(f"[NOTIFY] {title}: {message}")
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"{settings.ntfy_url}/{settings.ntfy_topic}",
+                    content=message,
+                    headers=headers,
+                    timeout=5.0,
+                )
+            logger.info(f"Notification sent: [{title}] {message}")
+        except Exception as e:
+            logger.error(f"Failed to send notification: {e}")
 
 
-class Notifier:
-    def __init__(self, channels: list[NotificationChannel]) -> None:
-        self._channels = channels
-
-    async def send(self, message: str, title: str = "Sezi") -> None:
-        for channel in self._channels:
-            try:
-                await channel.send(message, title)
-            except Exception as exc:
-                logger.error(f"Bildirim hatası ({channel.__class__.__name__}): {exc}")
-
-
-def build_notifier() -> Notifier:
-    channels: list[NotificationChannel] = [LogChannel()]
-    if settings.ntfy_topic:
-        channels.append(NtfyChannel(settings.ntfy_url, settings.ntfy_topic, settings.ntfy_token))
-    return Notifier(channels)
-
-
-notifier = build_notifier()
+notifier = Notifier()

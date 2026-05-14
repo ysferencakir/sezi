@@ -1,8 +1,10 @@
 from datetime import datetime, timedelta, timezone
+from fastapi import APIRouter, HTTPException, Query
+from loguru import logger
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import RedirectResponse
-
+from core.config import settings
 from core.database import AsyncSessionFactory
 from modules.health import google_fit
 from modules.health.models import OAuthToken
@@ -10,43 +12,54 @@ from modules.health.models import OAuthToken
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.get("/google")
-async def google_login():
-    """Tarayıcıda aç → Google yetkilendirme sayfasına yönlendirir."""
-    url = google_fit.build_auth_url()
-    return RedirectResponse(url)
+@router.get("/google/authorize")
+async def authorize_google():
+    """Return Google OAuth authorization URL."""
+    auth_url = google_fit.build_auth_url()
+    return {"url": auth_url, "message": "Redirect user to this URL to authorize"}
 
 
 @router.get("/google/callback")
-async def google_callback(code: str, state: str = "", error: str = ""):
-    if error:
-        raise HTTPException(status_code=400, detail=f"Google OAuth hatası: {error}")
+async def callback_google(code: str = Query(...), state: str = Query(None)):
+    """Handle Google OAuth callback and store token."""
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing authorization code")
 
-    data = await google_fit.exchange_code(code)
+    try:
+        token_data = await google_fit.exchange_code(code)
+    except Exception as e:
+        logger.error(f"Failed to exchange code: {e}")
+        raise HTTPException(status_code=400, detail="Failed to exchange authorization code")
 
-    async with AsyncSessionFactory() as session:
-        from sqlalchemy import select
-        result = await session.execute(
-            select(OAuthToken).where(OAuthToken.provider == "google")
-        )
-        token = result.scalar_one_or_none()
+    # Calculate expiration time
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600))
 
-        expires_at = datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 3600))
+    # Store token in database
+    stmt = insert(OAuthToken).values(
+        provider="google",
+        access_token=token_data["access_token"],
+        refresh_token=token_data.get("refresh_token", ""),
+        expires_at=expires_at,
+    ).on_conflict_do_update(
+        index_elements=["provider"],
+        set_=dict(
+            access_token=token_data["access_token"],
+            refresh_token=token_data.get("refresh_token", ""),
+            expires_at=expires_at,
+            updated_at=datetime.now(timezone.utc),
+        ),
+    )
 
-        if token:
-            token.access_token = data["access_token"]
-            token.expires_at = expires_at
-            if "refresh_token" in data:
-                token.refresh_token = data["refresh_token"]
-        else:
-            token = OAuthToken(
-                provider="google",
-                access_token=data["access_token"],
-                refresh_token=data.get("refresh_token", ""),
-                expires_at=expires_at,
-            )
-            session.add(token)
-
-        await session.commit()
-
-    return {"status": "ok", "message": "Google Fit yetkilendirmesi başarılı"}
+    try:
+        async with AsyncSessionFactory() as session:
+            await session.execute(stmt)
+            await session.commit()
+        logger.info("Google OAuth token stored successfully")
+        return {
+            "status": "success",
+            "message": "Authorization successful. Token stored.",
+            "expires_at": expires_at.isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"Failed to store token: {e}")
+        raise HTTPException(status_code=500, detail="Failed to store authorization token")
