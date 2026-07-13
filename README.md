@@ -136,9 +136,9 @@ Collects daily health data from Google Fit:
 - Heart rate readings
 - Sleep sessions
 
-**Schedule:**
-- Daily sync: 07:00 UTC (yesterday's data)
-- Morning report: 08:30 UTC (optional notification)
+**Schedule:** (all module schedules run in Europe/Istanbul time — see `core/scheduler.py`)
+- Daily sync: 07:00 TR (yesterday's data)
+- Morning report: 08:30 TR (optional notification)
 
 ---
 
@@ -191,12 +191,14 @@ Sleep periods with duration and stage.
 
 ## Scheduled Jobs
 
-Jobs are defined in each module's `schedules()` method. APScheduler runs them based on cron expressions:
+Jobs are defined in each module's `schedules()` method. APScheduler runs them based on cron expressions,
+all evaluated in **Europe/Istanbul** time (explicitly pinned in `core/scheduler.py` so behavior doesn't
+depend on the host machine's system timezone):
 
 ```
-"0 7 * * *"    = Every day at 07:00 UTC
-"30 8 * * *"   = Every day at 08:30 UTC
-"0 0 * * 0"    = Every Sunday at 00:00 UTC (cron format)
+"0 7 * * *"    = Every day at 07:00 TR
+"30 8 * * *"   = Every day at 08:30 TR
+"45 22 * * *"  = Every day at 22:45 TR
 ```
 
 ---

@@ -51,6 +51,18 @@
       <div id="calendar-card"><span class="empty">Yükleniyor…</span></div>
     </div>
     <div class="card">
+      <h2>Hava Durumu (son gün)</h2>
+      <div id="weather-card"><span class="empty">Yükleniyor…</span></div>
+    </div>
+    <div class="card">
+      <h2>Sigara (son gün)</h2>
+      <div id="smoking-card"><span class="empty">Yükleniyor…</span></div>
+    </div>
+    <div class="card">
+      <h2>Döviz Kurları (son gün)</h2>
+      <div id="currency-card"><span class="empty">Yükleniyor…</span></div>
+    </div>
+    <div class="card">
       <h2>Aktif Modüller</h2>
       <div id="modules-card" class="modules"><span class="empty">Yükleniyor…</span></div>
     </div>
@@ -87,11 +99,34 @@ async function loadSummary() {
 
     const c = document.getElementById("calendar-card");
     c.innerHTML = data.calendar
-      ? metric("Tarih", data.calendar.day)
+      ? metric("Tarih", data.calendar.day + (data.calendar.is_holiday ? " 🎌" : ""))
         + metric("Toplantı", data.calendar.meeting_count)
         + metric("Toplam süre", data.calendar.meeting_minutes + " dk")
         + metric("En yoğun saat", data.calendar.busiest_hour ?? "-")
         + metric("En uzun boş blok", (data.calendar.free_consecutive_hours ?? 0) + " saat")
+      : '<span class="empty">Henüz veri yok</span>';
+
+    const w = document.getElementById("weather-card");
+    w.innerHTML = data.weather
+      ? metric("Tarih", data.weather.day)
+        + metric("Durum", data.weather.condition ?? "-")
+        + metric("Sıcaklık", `${data.weather.temp_min ?? "-"}° / ${data.weather.temp_max ?? "-"}°C`)
+        + metric("Yağış", (data.weather.precipitation_mm ?? 0) + " mm")
+        + metric("Hava Kalitesi (AQI)", data.weather.european_aqi ?? "-")
+        + metric("PM2.5 / PM10", `${data.weather.pm2_5 ?? "-"} / ${data.weather.pm10 ?? "-"}`)
+        + metric("UV endeksi", data.weather.uv_index_max ?? "-")
+      : '<span class="empty">Henüz veri yok — bota Telegram üzerinden konum paylaş</span>';
+
+    const s = document.getElementById("smoking-card");
+    s.innerHTML = data.smoking
+      ? metric("Tarih", data.smoking.day) + metric("Adet", data.smoking.count)
+      : '<span class="empty">Henüz veri yok — bota /sigara yaz</span>';
+
+    const cur = document.getElementById("currency-card");
+    cur.innerHTML = data.currency
+      ? metric("Tarih", data.currency.day)
+        + metric("USD/TRY", data.currency.usd_try?.toFixed(2) ?? "-")
+        + metric("EUR/TRY", data.currency.eur_try?.toFixed(2) ?? "-")
       : '<span class="empty">Henüz veri yok</span>';
 
     const ctx = document.getElementById("context-card");

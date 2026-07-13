@@ -14,7 +14,7 @@ class ContextModule(BaseModule):
 
     def schedules(self) -> list[Schedule]:
         return [
-            Schedule("weekly_reminder", "0 18 * * 0", "remind", "Pazar akşamı haftalık context hatırlatması"),
+            Schedule("evening_reminder", "45 22 * * *", "remind", "Her akşam 22:45 (TR) context hatırlatması"),
         ]
 
     async def fetch(self) -> Any:

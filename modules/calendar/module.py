@@ -8,12 +8,14 @@ from sqlalchemy.dialects.postgresql import insert
 from core.base_module import BaseModule, Schedule
 from core.database import AsyncSessionFactory
 from core.notifier import notifier
-from modules.calendar import google_calendar
-from modules.calendar.models import CalendarDay
+from modules.calendar import google_calendar, holidays
+from modules.calendar.categories import categorize
+from modules.calendar.models import CalendarDay, CalendarEvent
 from modules.health import google_fit
 from modules.health.models import OAuthToken
 
-# Meşgul aralık dışındaki en uzun boşluğu hesaplarken kullanılan çalışma saatleri (UTC)
+# Meşgul aralık dışındaki en uzun boşluğu hesaplarken kullanılan çalışma saatleri
+# (etkinliğin kendi saat dilimine göre — bkz. _longest_free_gap)
 _WORK_START_HOUR = 8
 _WORK_END_HOUR = 22
 
@@ -74,12 +76,21 @@ class CalendarModule(BaseModule):
 
         day = data["date"]
         summary = self._summarize(data["events"], day)
+        summary["is_holiday"] = await holidays.is_public_holiday(day)
+        event_rows = self._extract_events(data["events"], day)
 
         async with AsyncSessionFactory() as session:
             stmt = insert(CalendarDay).values(**summary).on_conflict_do_update(
                 index_elements=["day"], set_=summary
             )
             await session.execute(stmt)
+
+            for row in event_rows:
+                event_stmt = insert(CalendarEvent).values(**row).on_conflict_do_update(
+                    index_elements=["google_event_id"], set_=row
+                )
+                await session.execute(event_stmt)
+
             await session.commit()
 
         logger.info(f"[calendar] {day} kaydedildi — {summary['meeting_count']} toplantı, {summary['meeting_minutes']} dk")
@@ -99,6 +110,7 @@ class CalendarModule(BaseModule):
 
         msg = (
             f"<b>Sabah Takvim Özeti — {row.day}</b>\n"
+            f"{'🎌 Resmi tatil' if row.is_holiday else ''}\n"
             f"📅 Toplantı: {row.meeting_count}\n"
             f"⏱ Toplam süre: {row.meeting_minutes} dk\n"
             f"🕐 En yoğun saat: {row.busiest_hour if row.busiest_hour is not None else '-'}\n"
@@ -137,6 +149,30 @@ class CalendarModule(BaseModule):
             "busiest_hour": busiest_hour,
             "free_consecutive_hours": free_hours,
         }
+
+    def _extract_events(self, events: list[dict], day) -> list[dict]:
+        rows = []
+        for event in events:
+            start_raw = event.get("start", {}).get("dateTime")
+            end_raw = event.get("end", {}).get("dateTime")
+            event_id = event.get("id")
+            if not start_raw or not end_raw or not event_id:
+                continue
+
+            start = datetime.fromisoformat(start_raw)
+            end = datetime.fromisoformat(end_raw)
+            title = event.get("summary", "")
+
+            rows.append({
+                "google_event_id": event_id,
+                "day": day,
+                "title": title,
+                "category": categorize(title),
+                "start_time": start,
+                "end_time": end,
+                "duration_minutes": int((end - start).total_seconds() / 60),
+            })
+        return rows
 
     def _longest_free_gap(self, intervals: list[tuple[datetime, datetime]], day) -> float:
         """08:00-22:00 çalışma penceresi içindeki en uzun kesintisiz boş bloğu (saat) döndürür."""

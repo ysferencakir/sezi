@@ -6,7 +6,9 @@ from loguru import logger
 
 from core.base_module import BaseModule, Schedule
 
-scheduler = AsyncIOScheduler()
+# Sunucunun sistem saat dilimi barındırma ortamına göre değişebilir (örn. Render.com UTC kullanır);
+# tüm modüllerin cron ifadeleri Türkiye saatine göre yazıldığı için burada açıkça sabitliyoruz.
+scheduler = AsyncIOScheduler(timezone="Europe/Istanbul")
 
 
 def _make_job(module: BaseModule, schedule: Schedule):

@@ -14,6 +14,8 @@ from telegram.ext import (
 
 from core.config import settings
 from modules.context import service
+from modules.smoking import service as smoking_service
+from modules.weather import location_service
 
 FEELING, NOTES, EVENTS = range(3)
 
@@ -79,6 +81,39 @@ async def _cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 
+async def _location_received(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Tekil ya da canlı konum paylaşımını yakalar.
+
+    Canlı konum güncellemeleri Telegram'dan `edited_message` olarak gelir
+    (update.message boş olur), bu yüzden effective_message kullanılıyor.
+    """
+    message = update.effective_message
+    loc = message.location
+    await location_service.update_location(latitude=loc.latitude, longitude=loc.longitude)
+    if loc.live_period:
+        return  # canlı konum güncellemelerinde her seferinde onay mesajı gönderme
+    await message.reply_text("Konum kaydedildi 📍 — hava durumu bu konuma göre çekilecek.")
+
+
+async def _smoke_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    keyboard = [
+        [InlineKeyboardButton(str(n), callback_data=f"smoke:{n}") for n in range(1, 11)],
+        [InlineKeyboardButton(str(n), callback_data=f"smoke:{n}") for n in range(11, 21)],
+    ]
+    await update.message.reply_text(
+        "Bugün kaç sigara içtin?",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+async def _smoke_chosen(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    count = int(query.data.split(":")[1])
+    await smoking_service.submit_count(day=date.today(), count=count)
+    await query.edit_message_text(f"Kaydedildi ✅ — bugün: {count}")
+
+
 def _build_application() -> Application:
     app = Application.builder().token(settings.telegram_bot_token).build()
     conv = ConversationHandler(
@@ -94,6 +129,9 @@ def _build_application() -> Application:
         fallbacks=[CommandHandler("cancel", _cancel)],
     )
     app.add_handler(conv)
+    app.add_handler(CommandHandler("sigara", _smoke_start))
+    app.add_handler(CallbackQueryHandler(_smoke_chosen, pattern=r"^smoke:"))
+    app.add_handler(MessageHandler(filters.LOCATION, _location_received))
     return app
 
 
