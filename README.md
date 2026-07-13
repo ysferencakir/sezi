@@ -308,19 +308,22 @@ Sezi has built-in guardrails:
 
 ## Future Roadmap
 
-### Phase 2 (Month 2+)
-- [ ] Calendar module (Google Calendar API)
-- [ ] Finance module (CSV upload)
-- [ ] Context module (weekly reflection form)
-- [ ] Query/filter endpoints
-- [ ] React dashboard
-- [ ] Email digest
+### Status (as of 2026-07-13)
+- [x] Core infra: scheduler, database, notifier (ntfy.sh + Telegram), dynamic module loader
+- [x] Health module (Google Fit: steps/heart rate/sleep, OAuth, daily sync + morning report)
+- [x] Calendar module (Google Calendar: daily meeting count/minutes/busiest hour/longest free block, shared Google OAuth token, daily sync + morning report)
+- [x] Context module (weekly reflection: `POST/GET /api/context`, Sunday 18:00 reminder notification)
+- [ ] Bank/finance module — not started
+- [ ] Investment module — not started
+- [ ] Query/filter endpoints — not started
+- [ ] React dashboard — not started
+- [ ] Email digest — not started
+- [ ] Samsung Health / Health Connect integration (replace Google Fit) — not started
 
-### Phase 3 (Month 3+)
+### Phase 3 (later)
 - [ ] Correlation detection
 - [ ] Baseline calculations
 - [ ] Monthly PDF reports
-- [ ] Health Connect API integration (replace Google Fit)
 
 ---
 

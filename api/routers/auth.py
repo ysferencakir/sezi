@@ -6,16 +6,21 @@ from sqlalchemy.dialects.postgresql import insert
 
 from core.config import settings
 from core.database import AsyncSessionFactory
+from modules.calendar import google_calendar
 from modules.health import google_fit
 from modules.health.models import OAuthToken
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+# Tüm Google entegrasyonları (health, calendar, ...) tek token altında toplanır —
+# yeni bir modül yeni scope eklediğinde burada birleştirilir ve kullanıcı tekrar yetkilendirir.
+_GOOGLE_SCOPES = google_fit.SCOPES + google_calendar.SCOPES
+
 
 @router.get("/google/authorize")
 async def authorize_google():
     """Return Google OAuth authorization URL."""
-    auth_url = google_fit.build_auth_url()
+    auth_url = google_fit.build_auth_url(scopes=_GOOGLE_SCOPES)
     return {"url": auth_url, "message": "Redirect user to this URL to authorize"}
 
 

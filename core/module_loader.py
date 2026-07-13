@@ -1,5 +1,10 @@
-from typing import Type
+import importlib
+import inspect
+import pkgutil
+
 from loguru import logger
+
+import modules
 from core.base_module import BaseModule
 from core.scheduler import register_module
 
@@ -8,13 +13,24 @@ _modules: dict[str, BaseModule] = {}
 
 
 def load_all() -> None:
-    """Dynamically load all BaseModule subclasses from modules/ directory."""
-    try:
-        from modules.health import HealthModule
-        register(HealthModule())
-        logger.info("Modules loaded successfully")
-    except ImportError as e:
-        logger.error(f"Failed to load modules: {e}")
+    """Dynamically discover and register every BaseModule subclass under modules/."""
+    for _, subpackage_name, is_pkg in pkgutil.iter_modules(modules.__path__):
+        if not is_pkg:
+            continue
+        try:
+            submodule = importlib.import_module(f"modules.{subpackage_name}")
+        except ImportError as e:
+            logger.error(f"Failed to import modules.{subpackage_name}: {e}")
+            continue
+
+        for _, obj in inspect.getmembers(submodule, inspect.isclass):
+            if obj is BaseModule or not issubclass(obj, BaseModule):
+                continue
+            if inspect.isabstract(obj):
+                continue
+            register(obj())
+
+    logger.info(f"Modules loaded successfully ({len(_modules)} module(s))")
 
 
 def register(module: BaseModule) -> None:

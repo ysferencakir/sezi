@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sezi</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f5f5f5; color: #222; margin: 0; padding: 2rem;
+  }
+  h1 { margin-bottom: 0.25rem; }
+  .subtitle { color: #777; margin-bottom: 2rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .card {
+    background: white; border-radius: 10px; padding: 1.25rem 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .card h2 { margin: 0 0 0.75rem; font-size: 1rem; color: #555; }
+  .card .empty { color: #999; font-size: 0.9rem; }
+  .metric { display: flex; justify-content: space-between; padding: 0.25rem 0; font-size: 0.95rem; }
+  .metric span:first-child { color: #666; }
+  .context-entry { border-top: 1px solid #eee; padding: 0.6rem 0; }
+  .context-entry:first-child { border-top: none; }
+  .context-entry .week { font-weight: 600; font-size: 0.85rem; color: #555; }
+  .context-entry .feeling { float: right; color: #888; }
+  .modules { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .badge { background: #eef; color: #335; border-radius: 999px; padding: 0.3rem 0.8rem; font-size: 0.85rem; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #17181c; color: #eee; }
+    .card { background: #24262c; box-shadow: none; }
+    .card h2 { color: #aaa; }
+    .metric span:first-child { color: #999; }
+    .badge { background: #2c2f55; color: #cdd; }
+    .context-entry { border-color: #333; }
+  }
+</style>
+</head>
+<body>
+  <h1>Sezi</h1>
+  <p class="subtitle">Kişisel yaşam yansıma paneli — placeholder</p>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Sağlık (son gün)</h2>
+      <div id="health-card"><span class="empty">Yükleniyor…</span></div>
+    </div>
+    <div class="card">
+      <h2>Takvim (son gün)</h2>
+      <div id="calendar-card"><span class="empty">Yükleniyor…</span></div>
+    </div>
+    <div class="card">
+      <h2>Aktif Modüller</h2>
+      <div id="modules-card" class="modules"><span class="empty">Yükleniyor…</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Haftalık Yansıma Notları</h2>
+    <div id="context-card"><span class="empty">Yükleniyor…</span></div>
+  </div>
+
+<script>
+async function fetchJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(url + " -> " + res.status);
+  return res.json();
+}
+
+function metric(label, value) {
+  return `<div class="metric"><span>${label}</span><span>${value}</span></div>`;
+}
+
+async function loadSummary() {
+  try {
+    const data = await fetchJSON("/api/summary");
+
+    const h = document.getElementById("health-card");
+    h.innerHTML = data.health
+      ? metric("Tarih", data.health.day)
+        + metric("Adım", data.health.steps.toLocaleString("tr-TR"))
+        + metric("Kalori", Math.round(data.health.calories) + " kcal")
+        + metric("Aktif dakika", data.health.active_minutes)
+        + metric("Mesafe", (data.health.distance_meters / 1000).toFixed(2) + " km")
+      : '<span class="empty">Henüz veri yok</span>';
+
+    const c = document.getElementById("calendar-card");
+    c.innerHTML = data.calendar
+      ? metric("Tarih", data.calendar.day)
+        + metric("Toplantı", data.calendar.meeting_count)
+        + metric("Toplam süre", data.calendar.meeting_minutes + " dk")
+        + metric("En yoğun saat", data.calendar.busiest_hour ?? "-")
+        + metric("En uzun boş blok", (data.calendar.free_consecutive_hours ?? 0) + " saat")
+      : '<span class="empty">Henüz veri yok</span>';
+
+    const ctx = document.getElementById("context-card");
+    ctx.innerHTML = data.context.length
+      ? data.context.map(row => `
+          <div class="context-entry">
+            <span class="week">${row.week_start}</span>
+            <span class="feeling">${row.general_feeling ? row.general_feeling + "/10" : ""}</span>
+            <div>${row.notes || ""}</div>
+            ${row.special_events ? `<div style="color:#888;font-size:0.85rem;">${row.special_events}</div>` : ""}
+          </div>
+        `).join("")
+      : '<span class="empty">Henüz not yok — bota /context yaz</span>';
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function loadModules() {
+  try {
+    const modules = await fetchJSON("/modules");
+    const m = document.getElementById("modules-card");
+    m.innerHTML = modules.map(mod => `<span class="badge">${mod.name} (${mod.schedule_count})</span>`).join("");
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+loadSummary();
+loadModules();
+</script>
+</body>
+</html>

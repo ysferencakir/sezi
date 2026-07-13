@@ -14,6 +14,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/fitness.heart_rate.read",
     "https://www.googleapis.com/auth/fitness.sleep.read",
     "https://www.googleapis.com/auth/fitness.body.read",
+    "https://www.googleapis.com/auth/fitness.location.read",  # com.google.distance.delta için gerekli
 ]
 
 # Google Fit veri tipi sabitleri
@@ -28,12 +29,12 @@ _SLEEP = "com.google.sleep.segment"
 SLEEP_STAGES = {1: "awake", 2: "sleep", 4: "light", 5: "deep", 6: "rem"}
 
 
-def build_auth_url(state: str = "") -> str:
+def build_auth_url(scopes: list[str] | None = None, state: str = "") -> str:
     params = {
         "client_id": settings.google_client_id,
         "redirect_uri": settings.google_redirect_uri,
         "response_type": "code",
-        "scope": " ".join(SCOPES),
+        "scope": " ".join(scopes or SCOPES),
         "access_type": "offline",
         "prompt": "consent",
         "state": state,
