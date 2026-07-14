@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     # Notion (internal integration token — OAuth değil)
     notion_token: str = ""
     notion_database_id: str = ""
+    # ScraperAPI (scraperapi.com) — eshot.gov.tr Render'ın datacenter IP'sini
+    # engelliyor, bu yüzden eshot_scraper.py istekleri Türkiye IP'si üzerinden
+    # proxy'leniyor. Boş bırakılırsa proxy kullanılmadan direkt istek atılır
+    # (local geliştirmede genelde gerekmez, prod'da/Render'da gerekli).
+    scraperapi_key: str = ""
 
     app_env: str = "development"
     log_level: str = "INFO"

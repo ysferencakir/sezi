@@ -6,9 +6,32 @@ from typing import Any
 import httpx
 from loguru import logger
 
+from core.config import settings
+
 _URL = "https://www.eshot.gov.tr/tr/OtobusumNerede/290"
 _MAX_RETRIES = 3
 _RETRY_BACKOFF_SECONDS = 2.0
+
+# eshot.gov.tr Render'ın (ve muhtemelen diğer bulut sağlayıcıların) datacenter
+# IP aralıklarını engelliyor — ScraperAPI'nin Türkiye IP'li proxy'si üzerinden
+# geçerek gerçek bir Türkiye kullanıcısı gibi görünüyoruz. Key boşsa direkt bağlanır
+# (local geliştirmede genelde gerekmez, çünkü ev/ofis IP'leri engellenmiyor).
+_SCRAPERAPI_PROXY_HOST = "proxy-server.scraperapi.com:8001"
+
+
+def _client_kwargs() -> dict[str, Any]:
+    if not settings.scraperapi_key:
+        return {"timeout": 15.0}
+    # eshot.gov.tr "korumalı domain" sayıldığı için premium=true şart — düz proxy
+    # modu 500 döndürüyor. Premium proxy istekleri daha yavaş olabiliyor (ScraperAPI
+    # dokümantasyonu 60-70sn öneriyor), bu yüzden timeout yüksek tutuluyor.
+    proxy_url = (
+        f"http://scraperapi.country_code=tr.premium=true:"
+        f"{settings.scraperapi_key}@{_SCRAPERAPI_PROXY_HOST}"
+    )
+    # ScraperAPI proxy modu HTTPS trafiğini kendi sertifikasıyla MITM ediyor —
+    # bu yüzden sertifika doğrulaması kapatılmalı (ScraperAPI'nin kendi dokümantasyonu).
+    return {"timeout": 70.0, "proxy": proxy_url, "verify": False}
 
 # Sayfa <td>HAT</td><td>HAT ADI</td><td>MESAFE</td><td>KALAN SÜRE</td> satırları döndürüyor.
 _TD_RE = re.compile(r"<td[^>]*>\s*([^<]*?)\s*</td>", re.IGNORECASE)
@@ -25,7 +48,7 @@ async def _post_with_retry(hat_id: str, durak_id: str, yon: int) -> str:
     last_exc: Exception | None = None
     for attempt in range(1, _MAX_RETRIES + 1):
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(**_client_kwargs()) as client:
                 resp = await client.post(
                     _URL,
                     data={"hatId": hat_id, "durakId": durak_id, "hatYon": str(yon)},
