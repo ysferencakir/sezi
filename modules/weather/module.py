@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import insert
 from core.base_module import BaseModule, Schedule
 from core.database import AsyncSessionFactory
 from core.notifier import notifier
-from modules.weather import location_service, open_meteo, open_meteo_air
+from modules.weather import location_service, open_meteo, open_meteo_air, sunset_times
 from modules.weather.models import WeatherDay
 
 
@@ -29,12 +29,14 @@ class WeatherModule(BaseModule):
         yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).date()
         weather = await open_meteo.fetch_daily_weather(location.latitude, location.longitude, yesterday)
         air_quality = await open_meteo_air.fetch_daily_air_quality(location.latitude, location.longitude, yesterday)
+        sun = await sunset_times.fetch_sun_times(location.latitude, location.longitude, yesterday)
         return {
             "day": yesterday,
             "latitude": location.latitude,
             "longitude": location.longitude,
             "weather": weather,
             "air_quality": air_quality,
+            "sun": sun,
         }
 
     async def process(self, data: dict[str, Any]) -> dict[str, Any]:
@@ -43,6 +45,7 @@ class WeatherModule(BaseModule):
 
         weather = data["weather"]
         air = data["air_quality"]
+        sun = data["sun"]
         values = {
             "day": data["day"],
             "latitude": data["latitude"],
@@ -56,6 +59,9 @@ class WeatherModule(BaseModule):
             "pm2_5": air["pm2_5"],
             "pm10": air["pm10"],
             "uv_index_max": air["uv_index_max"],
+            "sunrise": sun["sunrise"],
+            "sunset": sun["sunset"],
+            "day_length_minutes": sun["day_length_minutes"],
         }
 
         async with AsyncSessionFactory() as session:

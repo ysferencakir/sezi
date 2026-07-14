@@ -74,6 +74,9 @@ async def get_summary():
             "pm2_5": weather.pm2_5,
             "pm10": weather.pm10,
             "uv_index_max": weather.uv_index_max,
+            "sunrise": weather.sunrise.isoformat() if weather.sunrise else None,
+            "sunset": weather.sunset.isoformat() if weather.sunset else None,
+            "day_length_minutes": weather.day_length_minutes,
         },
         "smoking": None if smoking is None else {
             "day": smoking.day.isoformat(),

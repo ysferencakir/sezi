@@ -35,6 +35,9 @@ class WeatherDay(Base):
     pm2_5: Mapped[float | None] = mapped_column(Float, default=None)
     pm10: Mapped[float | None] = mapped_column(Float, default=None)
     uv_index_max: Mapped[float | None] = mapped_column(Float, default=None)
+    sunrise: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    sunset: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    day_length_minutes: Mapped[int | None] = mapped_column(Integer, default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

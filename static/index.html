@@ -115,6 +115,10 @@ async function loadSummary() {
         + metric("Hava Kalitesi (AQI)", data.weather.european_aqi ?? "-")
         + metric("PM2.5 / PM10", `${data.weather.pm2_5 ?? "-"} / ${data.weather.pm10 ?? "-"}`)
         + metric("UV endeksi", data.weather.uv_index_max ?? "-")
+        + metric("Gün ışığı süresi", data.weather.day_length_minutes ? (data.weather.day_length_minutes / 60).toFixed(1) + " saat" : "-")
+        + metric("Gün doğumu / batımı", data.weather.sunrise && data.weather.sunset
+            ? `${new Date(data.weather.sunrise).toLocaleTimeString("tr-TR", {hour:"2-digit", minute:"2-digit", timeZone:"UTC"})} / ${new Date(data.weather.sunset).toLocaleTimeString("tr-TR", {hour:"2-digit", minute:"2-digit", timeZone:"UTC"})} UTC`
+            : "-")
       : '<span class="empty">Henüz veri yok — bota Telegram üzerinden konum paylaş</span>';
 
     const s = document.getElementById("smoking-card");
