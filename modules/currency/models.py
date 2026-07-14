@@ -14,6 +14,8 @@ class CurrencyDay(Base):
     day: Mapped[datetime] = mapped_column(Date, unique=True, index=True)
     usd_try: Mapped[float | None] = mapped_column(Float, default=None)
     eur_try: Mapped[float | None] = mapped_column(Float, default=None)
+    gbp_try: Mapped[float | None] = mapped_column(Float, default=None)
+    chf_try: Mapped[float | None] = mapped_column(Float, default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -14,6 +14,13 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:8000/auth/google/callback"
+    # Spotify OAuth2
+    spotify_client_id: str = ""
+    spotify_client_secret: str = ""
+    spotify_redirect_uri: str = "http://localhost:8000/auth/spotify/callback"
+    # Notion (internal integration token — OAuth değil)
+    notion_token: str = ""
+    notion_database_id: str = ""
 
     app_env: str = "development"
     log_level: str = "INFO"

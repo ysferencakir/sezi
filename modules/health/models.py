@@ -31,6 +31,21 @@ class HealthDay(Base):
     calories: Mapped[float] = mapped_column(Float, default=0.0)
     active_minutes: Mapped[int] = mapped_column(Integer, default=0)
     distance_meters: Mapped[float] = mapped_column(Float, default=0.0)
+    # Vücut ölçümleri (son ölçülen değer o gün için)
+    weight_kg: Mapped[float | None] = mapped_column(Float, default=None)
+    height_cm: Mapped[float | None] = mapped_column(Float, default=None)
+    body_fat_percent: Mapped[float | None] = mapped_column(Float, default=None)
+    # Beslenme (günlük toplam, manuel loglanmışsa)
+    nutrition_calories: Mapped[float | None] = mapped_column(Float, default=None)
+    nutrition_protein_g: Mapped[float | None] = mapped_column(Float, default=None)
+    nutrition_fat_g: Mapped[float | None] = mapped_column(Float, default=None)
+    nutrition_carbs_g: Mapped[float | None] = mapped_column(Float, default=None)
+    # Diğer sağlık ölçümleri
+    blood_pressure_systolic: Mapped[float | None] = mapped_column(Float, default=None)
+    blood_pressure_diastolic: Mapped[float | None] = mapped_column(Float, default=None)
+    blood_glucose_mmol: Mapped[float | None] = mapped_column(Float, default=None)
+    oxygen_saturation_percent: Mapped[float | None] = mapped_column(Float, default=None)
+    hydration_liters: Mapped[float | None] = mapped_column(Float, default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -52,7 +67,7 @@ class HeartRate(Base):
 
 
 class SleepSession(Base):
-    """Sleep session data from Google Fit."""
+    """Sleep segment data from Google Fit (evre bazlı — awake/light/deep/rem)."""
     __tablename__ = "sleep_sessions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -60,6 +75,22 @@ class SleepSession(Base):
     end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     duration_minutes: Mapped[int] = mapped_column(Integer)
     stage: Mapped[str | None] = mapped_column(String(50), default=None)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Workout(Base):
+    """Exercise/activity sessions from Google Fit (sleep hariç — session activityType != 72)."""
+    __tablename__ = "workouts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    google_session_id: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    activity_type: Mapped[str] = mapped_column(String(50))
+    name: Mapped[str | None] = mapped_column(String(255), default=None)
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    duration_minutes: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

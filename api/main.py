@@ -58,6 +58,30 @@ async def run_module(name: str):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@app.post("/modules/{name}/trigger/{job_id}")
+async def trigger_module_job(name: str, job_id: str):
+    """Zamanlanmış bir job'ı (ör. digest.morning_digest) manuel tetikler —
+    aynı handler çağrıldığı için sonuç, mevcut veriyle her seferinde tutarlıdır."""
+    module = module_loader.get(name)
+    if module is None:
+        raise HTTPException(status_code=404, detail=f"Module '{name}' not found")
+
+    schedule = next((s for s in module.schedules() if s.job_id == job_id), None)
+    if schedule is None:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found on module '{name}'")
+
+    handler = getattr(module, schedule.handler, None)
+    if handler is None:
+        raise HTTPException(status_code=500, detail=f"Handler '{schedule.handler}' missing")
+
+    try:
+        result = await handler()
+        return {"status": "ok", "module": name, "job": job_id, "result": str(result)}
+    except Exception as exc:
+        logger.exception(f"Manual trigger failed for {name}.{job_id}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}

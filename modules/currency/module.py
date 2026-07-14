@@ -23,10 +23,14 @@ class CurrencyModule(BaseModule):
         yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).date()
         usd_rates = await frankfurter.fetch_rates(yesterday, symbols=["TRY"], base="USD")
         eur_rates = await frankfurter.fetch_rates(yesterday, symbols=["TRY"], base="EUR")
+        gbp_rates = await frankfurter.fetch_rates(yesterday, symbols=["TRY"], base="GBP")
+        chf_rates = await frankfurter.fetch_rates(yesterday, symbols=["TRY"], base="CHF")
         return {
             "day": yesterday,
             "usd_try": usd_rates.get("TRY"),
             "eur_try": eur_rates.get("TRY"),
+            "gbp_try": gbp_rates.get("TRY"),
+            "chf_try": chf_rates.get("TRY"),
         }
 
     async def process(self, data: dict[str, Any]) -> dict[str, Any]:

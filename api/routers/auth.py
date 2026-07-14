@@ -9,6 +9,7 @@ from core.database import AsyncSessionFactory
 from modules.calendar import google_calendar
 from modules.health import google_fit
 from modules.health.models import OAuthToken
+from modules.spotify import spotify_client
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -67,4 +68,55 @@ async def callback_google(code: str = Query(...), state: str = Query(None)):
         }
     except Exception as e:
         logger.error(f"Failed to store token: {e}")
+        raise HTTPException(status_code=500, detail="Failed to store authorization token")
+
+
+@router.get("/spotify/authorize")
+async def authorize_spotify():
+    """Return Spotify OAuth authorization URL."""
+    auth_url = spotify_client.build_auth_url()
+    return {"url": auth_url, "message": "Redirect user to this URL to authorize"}
+
+
+@router.get("/spotify/callback")
+async def callback_spotify(code: str = Query(...), state: str = Query(None)):
+    """Handle Spotify OAuth callback and store token."""
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing authorization code")
+
+    try:
+        token_data = await spotify_client.exchange_code(code)
+    except Exception as e:
+        logger.error(f"Failed to exchange Spotify code: {e}")
+        raise HTTPException(status_code=400, detail="Failed to exchange authorization code")
+
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600))
+
+    stmt = insert(OAuthToken).values(
+        provider="spotify",
+        access_token=token_data["access_token"],
+        refresh_token=token_data.get("refresh_token", ""),
+        expires_at=expires_at,
+    ).on_conflict_do_update(
+        index_elements=["provider"],
+        set_=dict(
+            access_token=token_data["access_token"],
+            refresh_token=token_data.get("refresh_token", ""),
+            expires_at=expires_at,
+            updated_at=datetime.now(timezone.utc),
+        ),
+    )
+
+    try:
+        async with AsyncSessionFactory() as session:
+            await session.execute(stmt)
+            await session.commit()
+        logger.info("Spotify OAuth token stored successfully")
+        return {
+            "status": "success",
+            "message": "Authorization successful. Token stored.",
+            "expires_at": expires_at.isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"Failed to store Spotify token: {e}")
         raise HTTPException(status_code=500, detail="Failed to store authorization token")

@@ -18,6 +18,14 @@ class CalendarEvent(Base):
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     duration_minutes: Mapped[int] = mapped_column(Integer)
+    all_day: Mapped[bool] = mapped_column(Boolean, default=False)
+    description: Mapped[str | None] = mapped_column(String(2000), default=None)
+    location: Mapped[str | None] = mapped_column(String(500), default=None)
+    attendee_count: Mapped[int | None] = mapped_column(Integer, default=None)
+    organizer_email: Mapped[str | None] = mapped_column(String(255), default=None)
+    recurring_event_id: Mapped[str | None] = mapped_column(String(255), default=None)
+    color_id: Mapped[str | None] = mapped_column(String(10), default=None)
+    meet_link: Mapped[str | None] = mapped_column(String(500), default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -34,6 +42,7 @@ class CalendarDay(Base):
     busiest_hour: Mapped[int | None] = mapped_column(Integer, default=None)
     free_consecutive_hours: Mapped[float | None] = mapped_column(Float, default=None)
     is_holiday: Mapped[bool] = mapped_column(Boolean, default=False)
+    holiday_name: Mapped[str | None] = mapped_column(String(255), default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -7,7 +7,6 @@ from sqlalchemy.dialects.postgresql import insert
 
 from core.base_module import BaseModule, Schedule
 from core.database import AsyncSessionFactory
-from core.notifier import notifier
 from modules.calendar import google_calendar, holidays
 from modules.calendar.categories import categorize
 from modules.calendar.models import CalendarDay, CalendarEvent
@@ -27,7 +26,6 @@ class CalendarModule(BaseModule):
     def schedules(self) -> list[Schedule]:
         return [
             Schedule("daily_sync", "15 7 * * *", "run", "Dün'ün takvim verisini çek"),
-            Schedule("morning_report", "35 8 * * *", "morning_report", "Sabah takvim özeti bildirimi"),
         ]
 
     # --- Token yönetimi (health modülüyle aynı "google" token'ı paylaşır) ---
@@ -76,7 +74,9 @@ class CalendarModule(BaseModule):
 
         day = data["date"]
         summary = self._summarize(data["events"], day)
-        summary["is_holiday"] = await holidays.is_public_holiday(day)
+        holiday_name = await holidays.get_holiday_name(day)
+        summary["is_holiday"] = holiday_name is not None
+        summary["holiday_name"] = holiday_name
         event_rows = self._extract_events(data["events"], day)
 
         async with AsyncSessionFactory() as session:
@@ -95,28 +95,6 @@ class CalendarModule(BaseModule):
 
         logger.info(f"[calendar] {day} kaydedildi — {summary['meeting_count']} toplantı, {summary['meeting_minutes']} dk")
         return summary
-
-    # --- Bildirim ---
-
-    async def morning_report(self) -> None:
-        async with AsyncSessionFactory() as session:
-            result = await session.execute(
-                select(CalendarDay).order_by(CalendarDay.day.desc()).limit(1)
-            )
-            row = result.scalar_one_or_none()
-
-        if row is None:
-            return
-
-        msg = (
-            f"<b>Sabah Takvim Özeti — {row.day}</b>\n"
-            f"{'🎌 Resmi tatil' if row.is_holiday else ''}\n"
-            f"📅 Toplantı: {row.meeting_count}\n"
-            f"⏱ Toplam süre: {row.meeting_minutes} dk\n"
-            f"🕐 En yoğun saat: {row.busiest_hour if row.busiest_hour is not None else '-'}\n"
-            f"🌤 En uzun boş blok: {row.free_consecutive_hours or 0:.1f} saat"
-        )
-        await notifier.send(msg, title="Takvim Özeti")
 
     # --- Yardımcı ---
 
@@ -153,15 +131,32 @@ class CalendarModule(BaseModule):
     def _extract_events(self, events: list[dict], day) -> list[dict]:
         rows = []
         for event in events:
-            start_raw = event.get("start", {}).get("dateTime")
-            end_raw = event.get("end", {}).get("dateTime")
             event_id = event.get("id")
-            if not start_raw or not end_raw or not event_id:
+            if not event_id:
                 continue
 
-            start = datetime.fromisoformat(start_raw)
-            end = datetime.fromisoformat(end_raw)
+            start_raw = event.get("start", {}).get("dateTime")
+            end_raw = event.get("end", {}).get("dateTime")
+            all_day = not start_raw or not end_raw
+
+            if all_day:
+                # Tüm gün süren etkinlikler sadece "date" alanına sahip — gün sınırlarını kullan.
+                start = datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
+                end = start + timedelta(days=1)
+            else:
+                start = datetime.fromisoformat(start_raw)
+                end = datetime.fromisoformat(end_raw)
+
             title = event.get("summary", "")
+            attendees = event.get("attendees")
+            meet_link = next(
+                (
+                    ep.get("uri")
+                    for ep in event.get("conferenceData", {}).get("entryPoints", [])
+                    if ep.get("entryPointType") == "video"
+                ),
+                None,
+            )
 
             rows.append({
                 "google_event_id": event_id,
@@ -171,6 +166,14 @@ class CalendarModule(BaseModule):
                 "start_time": start,
                 "end_time": end,
                 "duration_minutes": int((end - start).total_seconds() / 60),
+                "all_day": all_day,
+                "description": (event.get("description") or None) and event["description"][:2000],
+                "location": (event.get("location") or None) and event["location"][:500],
+                "attendee_count": len(attendees) if attendees else None,
+                "organizer_email": event.get("organizer", {}).get("email"),
+                "recurring_event_id": event.get("recurringEventId"),
+                "color_id": event.get("colorId"),
+                "meet_link": meet_link,
             })
         return rows
 
