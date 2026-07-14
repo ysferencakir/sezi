@@ -16,7 +16,7 @@ async def fetch_approaching_buses(durak_id: str) -> list[dict[str, Any]]:
 
 async def fetch_line_approaching_buses(hat_id: str, durak_id: str) -> list[dict[str, Any]]:
     """Belirtilen hattın, belirtilen durağa yaklaşan otobüslerini döner."""
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=15.0) as client:
         resp = await client.get(f"{_BASE_URL}/hattinyaklasanotobusleri/{hat_id}/{durak_id}")
         resp.raise_for_status()
         return resp.json() or []

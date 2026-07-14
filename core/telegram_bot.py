@@ -122,14 +122,36 @@ async def _smoke_chosen(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def _fetch_route_arrivals(route: dict) -> list[dict]:
     """ESHOT'un resmi sitesinden gerçek mesafe/süre ile yaklaşan otobüsleri çeker
     (bkz. eshot_scraper.py — site scraping, resmi public API'de bu veri yok).
-    Sorun çıkarsa sessizce boş döner — /otobus komutu o bacağı 'veri yok' gösterir."""
+
+    eshot.gov.tr bazı barındırma sağlayıcılarının IP aralıklarını engelliyor
+    olabilir (Render'dan ConnectTimeout gözlemlendi) — bu durumda openapi.izmir.bel.tr
+    üzerindeki resmi (ama mesafe/süre içermeyen) API'ye otomatik geri dönülür."""
     hat_ids = route.get("hat_ids") or []
     try:
         rows = await eshot_scraper.fetch_arrivals(route["durak_id"], hat_ids[0], route["hat_yon"])
+        return [r for r in rows if not hat_ids or r["hat"] in hat_ids]
     except Exception as exc:
-        logger.warning(f"[transit] {route['label']} sorgusu başarısız: {type(exc).__name__}: {exc!r}")
+        logger.warning(f"[transit] {route['label']} (eshot) başarısız: {type(exc).__name__}: {exc!r} — resmi API'ye düşülüyor")
+
+    try:
+        fallback_rows = []
+        for hat_id in hat_ids:
+            buses = await izmir_transit.fetch_line_approaching_buses(hat_id, route["durak_id"])
+            fallback_rows.extend(buses)
+            await asyncio.sleep(0.3)
+        return [
+            {
+                "hat": str(b.get("HatNumarasi")),
+                "hat_adi": _tr_title(b.get("HatAdi", "")),
+                "mesafe": "-",
+                "sure": f"{b.get('KalanDurakSayisi')} durak",
+                "at_stop": False,
+            }
+            for b in fallback_rows
+        ]
+    except Exception as exc:
+        logger.warning(f"[transit] {route['label']} (izmir_transit) da başarısız: {type(exc).__name__}: {exc!r}")
         return []
-    return [r for r in rows if not hat_ids or r["hat"] in hat_ids]
 
 
 async def _nearby_stops(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
