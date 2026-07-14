@@ -22,11 +22,16 @@ async def fetch_arrivals(durak_id: str, hat_id: str, yon: int) -> list[dict[str,
     parse ediyoruz (sayfa yapısı değişirse kırılabilir). `hatId` sadece
     sayfa başlığını belirliyor gibi görünüyor — asıl filtre `durakId` + `hatYon`.
     """
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=15.0) as client:
         resp = await client.post(
             _URL,
             data={"hatId": hat_id, "durakId": durak_id, "hatYon": str(yon)},
-            headers={"User-Agent": "Mozilla/5.0"},
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+                ),
+            },
         )
         resp.raise_for_status()
         body = resp.text

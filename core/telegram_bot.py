@@ -127,7 +127,7 @@ async def _fetch_route_arrivals(route: dict) -> list[dict]:
     try:
         rows = await eshot_scraper.fetch_arrivals(route["durak_id"], hat_ids[0], route["hat_yon"])
     except Exception as exc:
-        logger.warning(f"[transit] {route['label']} sorgusu başarısız: {exc}")
+        logger.warning(f"[transit] {route['label']} sorgusu başarısız: {type(exc).__name__}: {exc!r}")
         return []
     return [r for r in rows if not hat_ids or r["hat"] in hat_ids]
 
