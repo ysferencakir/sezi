@@ -16,7 +16,7 @@ from telegram.ext import (
 from core.config import settings
 from modules.context import service
 from modules.smoking import service as smoking_service
-from modules.transit import izmir_transit
+from modules.transit import eshot_scraper, izmir_transit
 from modules.transit.routes import ROUTES
 from modules.weather import location_service
 
@@ -119,23 +119,17 @@ async def _smoke_chosen(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await query.edit_message_text(f"Kaydedildi ✅ — bugün: {count}")
 
 
-async def _fetch_route_buses(route: dict) -> list[dict]:
+async def _fetch_route_arrivals(route: dict) -> list[dict]:
+    """ESHOT'un resmi sitesinden gerçek mesafe/süre ile yaklaşan otobüsleri çeker
+    (bkz. eshot_scraper.py — site scraping, resmi public API'de bu veri yok).
+    Sorun çıkarsa sessizce boş döner — /otobus komutu o bacağı 'veri yok' gösterir."""
     hat_ids = route.get("hat_ids") or []
-    if not hat_ids:
-        try:
-            return await izmir_transit.fetch_approaching_buses(route["durak_id"])
-        except Exception as exc:
-            logger.warning(f"[transit] {route['label']} sorgusu başarısız: {exc}")
-            return []
-
-    buses: list[dict] = []
-    for hat_id in hat_ids:
-        try:
-            buses.extend(await izmir_transit.fetch_line_approaching_buses(hat_id, route["durak_id"]))
-        except Exception as exc:
-            logger.warning(f"[transit] {route['label']} (hat {hat_id}) sorgusu başarısız: {exc}")
-        await asyncio.sleep(0.3)
-    return buses
+    try:
+        rows = await eshot_scraper.fetch_arrivals(route["durak_id"], hat_ids[0], route["hat_yon"])
+    except Exception as exc:
+        logger.warning(f"[transit] {route['label']} sorgusu başarısız: {exc}")
+        return []
+    return [r for r in rows if not hat_ids or r["hat"] in hat_ids]
 
 
 async def _nearby_stops(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -158,51 +152,84 @@ async def _nearby_stops(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("Yakında durak bulunamadı.")
         return
 
-    lines = ["<b>📍 Yakındaki Duraklar</b>"]
+    lines = ["<b>📍 Yakındaki Duraklar</b>", "<pre>"]
     for stop in stops[:5]:
         mesafe = stop.get("mesafe")
         mesafe_str = f"{mesafe:.0f} m" if mesafe is not None else "-"
-        lines.append(f"  {stop.get('adi')} (durak {stop.get('durakId')}) — {mesafe_str}")
+        adi = (stop.get("adi") or "")[:28]
+        lines.append(f"{adi:<28} {mesafe_str:>6}  #{stop.get('durakId')}")
+    lines.append("</pre>")
 
     await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+
+
+def _tr_title(text: str) -> str:
+    """TÜM BÜYÜK HARFLİ hat adlarını okunur bir 'Title Case' hale getirir."""
+    _lower_map = str.maketrans("IİÇĞÖŞÜ", "ıiçğöşü")
+    _upper_first = {"i": "İ", "ı": "I"}
+
+    words = []
+    for word in text.strip().split(" "):
+        if not word:
+            continue
+        lowered = word.translate(_lower_map).lower()
+        first = _upper_first.get(lowered[0], lowered[0].upper())
+        words.append(first + lowered[1:])
+    return " ".join(words)
+
+
+def _short_mesafe(mesafe: str) -> str:
+    return mesafe.replace(" metre", " m")
+
+
+def _format_arrivals_table(arrivals: list[dict]) -> str:
+    """Hat/mesafe/süreyi hizalı, monospace bir tabloya dönüştürür."""
+    header = f"{'Hat':<5}{'Mesafe':>9}   {'Süre':<10}"
+    row_lines = [header, "-" * len(header)]
+    for row in arrivals:
+        if row["at_stop"]:
+            row_lines.append(f"{row['hat']:<5}{'🔴 Durakta':>9}")
+        else:
+            row_lines.append(f"{row['hat']:<5}{_short_mesafe(row['mesafe']):>9}   {row['sure']:<10}")
+    return "<pre>" + "\n".join(row_lines) + "</pre>"
 
 
 async def _send_route_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE, routes: list[dict], title: str) -> None:
     await ctx.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
-    # İZTEK API'si art arda hızlı isteklerde 429 (rate limit) dönebiliyor —
+    # ESHOT sitesi art arda hızlı isteklerde sorun çıkarabiliyor —
     # güvenilirlik için sıralı ve aralıklı çekiliyor (hız kritik değil).
     results = []
     for route in routes:
-        results.append(await _fetch_route_buses(route))
+        results.append(await _fetch_route_arrivals(route))
         await asyncio.sleep(0.3)
 
     lines = [f"<b>{title}</b>"]
-    for route, buses in zip(routes, results):
+    for route, arrivals in zip(routes, results):
         lines.append(f"\n<b>{route['label']}</b>")
-        if not buses:
-            lines.append("  yaklaşan otobüs yok")
+        if not arrivals:
+            lines.append("<i>Yaklaşan otobüs yok</i>")
             continue
 
-        # Aynı hatta birden fazla fiziksel otobüs aynı "kalan durak" değerini
-        # gösterebiliyor — kullanıcıya tekrar tekrar aynı satırı göstermemek için
-        # (hat, kalan durak) kombinasyonuna göre tekilleştirip en yakın 3'ü listeliyoruz.
+        # Aynı hatta birden fazla fiziksel otobüs aynı mesafe/süreyi gösterebiliyor —
+        # tekrar tekrar aynı satırı göstermemek için tekilleştirip en yakın 3'ü listeliyoruz.
         seen = set()
-        unique_buses = []
-        for bus in sorted(buses, key=lambda b: b.get("KalanDurakSayisi", 0)):
-            key = (bus.get("HatNumarasi"), bus.get("KalanDurakSayisi"))
+        unique_arrivals = []
+        for row in arrivals:
+            key = (row["hat"], row["mesafe"], row["sure"])
             if key in seen:
                 continue
             seen.add(key)
-            unique_buses.append(bus)
+            unique_arrivals.append({**row, "hat_adi": _tr_title(row["hat_adi"])})
 
-        for bus in unique_buses[:3]:
-            engelli = " ♿" if bus.get("EngelliMi") else ""
-            bisiklet = " 🚲" if bus.get("BisikletAparatliMi") else ""
-            lines.append(
-                f"  {bus.get('HatNumarasi')} {bus.get('HatAdi', '')} — "
-                f"{bus.get('KalanDurakSayisi')} durak kaldı{engelli}{bisiklet}"
-            )
+        # Aynı bacaktaki farklı hatlar için (ör. 268 ve 368) hat adını bir kez başlık olarak yaz.
+        by_line: dict[str, list[dict]] = {}
+        for row in unique_arrivals[:6]:
+            by_line.setdefault(row["hat_adi"], []).append(row)
+
+        for hat_adi, rows in by_line.items():
+            lines.append(f"<i>{hat_adi}</i>")
+            lines.append(_format_arrivals_table(rows[:3]))
 
     await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
