@@ -1,5 +1,6 @@
 import asyncio
-from datetime import date, timedelta
+import re
+from datetime import date, datetime, timedelta
 
 from loguru import logger
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -119,13 +120,16 @@ async def _smoke_chosen(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await query.edit_message_text(f"Kaydedildi ✅ — bugün: {count}")
 
 
-async def _fetch_route_arrivals(route: dict) -> list[dict]:
+async def _fetch_route_arrivals(route: dict) -> list[dict] | None:
     """ESHOT'un resmi sitesinden gerçek mesafe/süre ile yaklaşan otobüsleri çeker
     (bkz. eshot_scraper.py — site scraping, resmi public API'de bu veri yok).
 
     eshot.gov.tr bazı barındırma sağlayıcılarının IP aralıklarını engelliyor
     olabilir (Render'dan ConnectTimeout gözlemlendi) — bu durumda openapi.izmir.bel.tr
-    üzerindeki resmi (ama mesafe/süre içermeyen) API'ye otomatik geri dönülür."""
+    üzerindeki resmi (ama mesafe/süre içermeyen) API'ye otomatik geri dönülür.
+
+    Her iki kaynak da başarısız olursa None döner — bu, "gerçekten otobüs yok"
+    durumundan ("boş liste") ayırt edilebilsin diye."""
     hat_ids = route.get("hat_ids") or []
     try:
         rows = await eshot_scraper.fetch_arrivals(route["durak_id"], hat_ids[0], route["hat_yon"])
@@ -151,7 +155,7 @@ async def _fetch_route_arrivals(route: dict) -> list[dict]:
         ]
     except Exception as exc:
         logger.warning(f"[transit] {route['label']} (izmir_transit) da başarısız: {type(exc).__name__}: {exc!r}")
-        return []
+        return None
 
 
 async def _nearby_stops(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -174,14 +178,16 @@ async def _nearby_stops(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("Yakında durak bulunamadı.")
         return
 
-    lines = ["📍 <b>Yakındaki Duraklar</b>", ""]
+    col_adi, col_mesafe = 26, 7
+    header = f"{'Durak':<{col_adi}}{'Mesafe':>{col_mesafe}}  Kod"
+    row_lines = [header, "─" * len(header)]
     for stop in stops[:5]:
         mesafe = stop.get("mesafe")
         mesafe_str = f"{mesafe:.0f} m" if mesafe is not None else "-"
-        adi = stop.get("adi") or ""
-        lines.append(f"▫️ <b>{adi}</b>")
-        lines.append(f"    📏 {mesafe_str}  ·  #{stop.get('durakId')}")
+        adi = (stop.get("adi") or "")[: col_adi - 1]
+        row_lines.append(f"{adi:<{col_adi}}{mesafe_str:>{col_mesafe}}  #{stop.get('durakId')}")
 
+    lines = ["<b>📍 Yakındaki Duraklar</b>", "<pre>" + "\n".join(row_lines) + "</pre>"]
     await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
 
@@ -204,10 +210,52 @@ def _short_mesafe(mesafe: str) -> str:
     return mesafe.replace(" metre", " m")
 
 
-def _format_arrival_row(row: dict) -> str:
+_BOLD_DIGITS = str.maketrans("0123456789", "𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵")
+
+
+def _bold_hat(hat: str) -> str:
+    """<pre> içinde <b> çalışmadığından hat numarasını Unicode kalın rakamlarla vurgular."""
+    return hat.translate(_BOLD_DIGITS)
+
+
+def _mesafe_meters(row: dict) -> float:
+    """Sıralama/eşik kıyaslaması için mesafeyi metreye çevirir; okunamıyorsa en sona atar."""
     if row["at_stop"]:
-        return f"    🔴 <b>Hat {row['hat']}</b> — Durakta"
-    return f"    🚍 <b>Hat {row['hat']}</b> — 📏 {_short_mesafe(row['mesafe'])} · ⏱ {row['sure']}"
+        return -1
+    match = re.search(r"\d+", row["mesafe"])
+    return float(match.group()) if match else float("inf")
+
+
+def _sure_minutes(row: dict) -> float | None:
+    """'sure' alanından dakikayı okur; durak-sayısı fallback'inde ('X durak') dakika bilinmez."""
+    match = re.search(r"(\d+)\s*dk", row["sure"])
+    return float(match.group(1)) if match else None
+
+
+def _proximity_icon(row: dict) -> str:
+    meters = _mesafe_meters(row)
+    if meters < 0:
+        return "🔴"
+    if meters <= 500:
+        return "🟢"
+    if meters <= 1000:
+        return "🟡"
+    return "⚪"
+
+
+def _format_arrivals_table(arrivals: list[dict]) -> str:
+    """Hat/hat adı/mesafe/süreyi hizalı, monospace bir tabloya dönüştürür (en yakın önce)."""
+    arrivals = sorted(arrivals, key=_mesafe_meters)
+    col_icon, col_hat, col_adi, col_mesafe = 3, 5, 22, 9
+    header = f"{'':<{col_icon}}{'Hat':<{col_hat}}{'Hat Adı':<{col_adi}}{'Mesafe':>{col_mesafe}}   Süre"
+    row_lines = [header, "─" * len(header)]
+    for row in arrivals:
+        hat_adi = row["hat_adi"][: col_adi - 1]
+        icon = _proximity_icon(row)
+        mesafe = "Durakta" if row["at_stop"] else _short_mesafe(row["mesafe"])
+        hat = _bold_hat(row["hat"])
+        row_lines.append(f"{icon:<{col_icon}}{hat:<{col_hat}}{hat_adi:<{col_adi}}{mesafe:>{col_mesafe}}   {row['sure']}")
+    return "<pre>" + "\n".join(row_lines) + "</pre>"
 
 
 async def _send_route_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE, routes: list[dict], title: str) -> None:
@@ -220,15 +268,18 @@ async def _send_route_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE, rou
         results.append(await _fetch_route_arrivals(route))
         await asyncio.sleep(0.3)
 
-    lines = [f"<b>{title}</b>", "━━━━━━━━━━━━━━━━━━━━"]
+    lines = [f"<b>{title}</b>"]
     for route, arrivals in zip(routes, results):
-        lines.append(f"\n📍 <b>{route['label']}</b>")
+        lines.append(f"\n➤ <b>{route['label']}</b>")
+        if arrivals is None:
+            lines.append("<i>⚠️ Veri alınamadı, tekrar dener misin?</i>")
+            continue
         if not arrivals:
-            lines.append("    💤 <i>Yaklaşan otobüs yok</i>")
+            lines.append("<i>Yaklaşan otobüs yok</i>")
             continue
 
         # Aynı hatta birden fazla fiziksel otobüs aynı mesafe/süreyi gösterebiliyor —
-        # tekrar tekrar aynı satırı göstermemek için tekilleştirip en yakın 3'ü listeliyoruz.
+        # tekrar tekrar aynı satırı göstermemek için tekilleştirip en yakın 6'yı listeliyoruz.
         seen = set()
         unique_arrivals = []
         for row in arrivals:
@@ -238,16 +289,22 @@ async def _send_route_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE, rou
             seen.add(key)
             unique_arrivals.append({**row, "hat_adi": _tr_title(row["hat_adi"])})
 
-        # Aynı bacaktaki farklı hatlar için (ör. 268 ve 368) hat adını bir kez başlık olarak yaz.
-        by_line: dict[str, list[dict]] = {}
-        for row in unique_arrivals[:6]:
-            by_line.setdefault(row["hat_adi"], []).append(row)
+        at_stop_hats = [row["hat"] for row in unique_arrivals if row["at_stop"]]
+        if at_stop_hats:
+            hat_list = ", ".join(dict.fromkeys(at_stop_hats))
+            lines.append(f"🔴 <b>{hat_list}</b> şu an durakta!")
 
-        for hat_adi, rows in by_line.items():
-            lines.append(f"  🚏 <i>{hat_adi}</i>")
-            for row in rows[:3]:
-                lines.append(_format_arrival_row(row))
+        soon_hats = [
+            row["hat"] for row in unique_arrivals
+            if not row["at_stop"] and (mins := _sure_minutes(row)) is not None and mins <= 2
+        ]
+        if soon_hats:
+            hat_list = ", ".join(dict.fromkeys(soon_hats))
+            lines.append(f"⏰ <b>{hat_list}</b> neredeyse geldi, acele et!")
 
+        lines.append(_format_arrivals_table(unique_arrivals[:6]))
+
+    lines.append(f"\n<i>Son güncelleme: {datetime.now().strftime('%H:%M')}</i>")
     await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
 
