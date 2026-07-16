@@ -207,15 +207,16 @@ def _tr_title(text: str) -> str:
 
 
 def _short_mesafe(mesafe: str) -> str:
-    return mesafe.replace(" metre", " m")
+    """'2405 metre' → '2.4 km', '409 metre' → '409 m' — km'ye geçince okunması kolaylaşır."""
+    match = re.search(r"\d+", mesafe)
+    if not match:
+        return mesafe
+    meters = int(match.group())
+    return f"{meters / 1000:.1f} km" if meters >= 1000 else f"{meters} m"
 
 
-_BOLD_DIGITS = str.maketrans("0123456789", "𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵")
-
-
-def _bold_hat(hat: str) -> str:
-    """<pre> içinde <b> çalışmadığından hat numarasını Unicode kalın rakamlarla vurgular."""
-    return hat.translate(_BOLD_DIGITS)
+def _short_sure(sure: str) -> str:
+    return sure.replace(" saniye", " sn").replace("saniye", "sn")
 
 
 def _mesafe_meters(row: dict) -> float:
@@ -233,29 +234,52 @@ def _sure_minutes(row: dict) -> float | None:
 
 
 def _proximity_icon(row: dict) -> str:
-    meters = _mesafe_meters(row)
-    if meters < 0:
+    if row["at_stop"]:
         return "🔴"
+    meters = _mesafe_meters(row)
     if meters <= 500:
         return "🟢"
-    if meters <= 1000:
+    if meters <= 1500:
         return "🟡"
     return "⚪"
 
 
-def _format_arrivals_table(arrivals: list[dict]) -> str:
-    """Hat/hat adı/mesafe/süreyi hizalı, monospace bir tabloya dönüştürür (en yakın önce)."""
-    arrivals = sorted(arrivals, key=_mesafe_meters)
-    col_icon, col_hat, col_adi, col_mesafe = 3, 5, 22, 9
-    header = f"{'':<{col_icon}}{'Hat':<{col_hat}}{'Hat Adı':<{col_adi}}{'Mesafe':>{col_mesafe}}   Süre"
-    row_lines = [header, "─" * len(header)]
-    for row in arrivals:
-        hat_adi = row["hat_adi"][: col_adi - 1]
-        icon = _proximity_icon(row)
-        mesafe = "Durakta" if row["at_stop"] else _short_mesafe(row["mesafe"])
-        hat = _bold_hat(row["hat"])
-        row_lines.append(f"{icon:<{col_icon}}{hat:<{col_hat}}{hat_adi:<{col_adi}}{mesafe:>{col_mesafe}}   {row['sure']}")
-    return "<pre>" + "\n".join(row_lines) + "</pre>"
+_DIVIDER = "┄" * 22
+
+
+def _format_route_body(arrivals: list[dict]) -> list[str]:
+    """Bir güzergahın altına dizilecek satırları üretir — tablo değil, kart/liste hissi verecek
+    şekilde bold/italic + emoji kullanılıyor (hizalamaya bağımlı <pre> tablodan kasıtlı olarak
+    vazgeçildi, çünkü emoji genişliği cihaza göre değişip monospace hizasını bozabiliyor)."""
+    if not arrivals:
+        return ["   💤 <i>şu an yaklaşan otobüs yok</i>"]
+
+    # Aynı hatta birden fazla fiziksel otobüs aynı mesafe/süreyi gösterebiliyor —
+    # tekilleştirip en yakın olandan başlayarak sırala.
+    seen = set()
+    unique_arrivals = []
+    for row in sorted(arrivals, key=_mesafe_meters):
+        key = (row["hat"], row["mesafe"], row["sure"])
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_arrivals.append({**row, "hat_adi": _tr_title(row["hat_adi"])})
+
+    by_line: dict[str, list[dict]] = {}
+    for row in unique_arrivals[:8]:
+        by_line.setdefault(f"{row['hat']}|{row['hat_adi']}", []).append(row)
+
+    body: list[str] = []
+    for key, rows in by_line.items():
+        hat, hat_adi = key.split("|", 1)
+        body.append(f"   🚍 <b>{hat}</b>  {hat_adi}")
+        for row in rows[:3]:
+            if row["at_stop"]:
+                body.append("      🔴 <b>durakta!</b>")
+            else:
+                icon = _proximity_icon(row)
+                body.append(f"      {icon} {_short_mesafe(row['mesafe'])}  ·  {_short_sure(row['sure'])}")
+    return body
 
 
 async def _send_route_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE, routes: list[dict], title: str) -> None:
@@ -268,43 +292,20 @@ async def _send_route_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE, rou
         results.append(await _fetch_route_arrivals(route))
         await asyncio.sleep(0.3)
 
-    lines = [f"<b>{title}</b>"]
-    for route, arrivals in zip(routes, results):
-        lines.append(f"\n➤ <b>{route['label']}</b>")
+    lines = [f"<b>{title}</b>", _DIVIDER]
+    for i, (route, arrivals) in enumerate(zip(routes, results)):
+        if i > 0:
+            lines.append(_DIVIDER)
+        lines.append(f"\n<b>{route['label']}</b>")
+
         if arrivals is None:
-            lines.append("<i>⚠️ Veri alınamadı, tekrar dener misin?</i>")
-            continue
-        if not arrivals:
-            lines.append("<i>Yaklaşan otobüs yok</i>")
+            lines.append("   ⚠️ <i>veri alınamadı, tekrar dener misin?</i>")
             continue
 
-        # Aynı hatta birden fazla fiziksel otobüs aynı mesafe/süreyi gösterebiliyor —
-        # tekrar tekrar aynı satırı göstermemek için tekilleştirip en yakın 6'yı listeliyoruz.
-        seen = set()
-        unique_arrivals = []
-        for row in arrivals:
-            key = (row["hat"], row["mesafe"], row["sure"])
-            if key in seen:
-                continue
-            seen.add(key)
-            unique_arrivals.append({**row, "hat_adi": _tr_title(row["hat_adi"])})
+        lines.extend(_format_route_body(arrivals))
 
-        at_stop_hats = [row["hat"] for row in unique_arrivals if row["at_stop"]]
-        if at_stop_hats:
-            hat_list = ", ".join(dict.fromkeys(at_stop_hats))
-            lines.append(f"🔴 <b>{hat_list}</b> şu an durakta!")
-
-        soon_hats = [
-            row["hat"] for row in unique_arrivals
-            if not row["at_stop"] and (mins := _sure_minutes(row)) is not None and mins <= 2
-        ]
-        if soon_hats:
-            hat_list = ", ".join(dict.fromkeys(soon_hats))
-            lines.append(f"⏰ <b>{hat_list}</b> neredeyse geldi, acele et!")
-
-        lines.append(_format_arrivals_table(unique_arrivals[:6]))
-
-    lines.append(f"\n<i>Son güncelleme: {datetime.now().strftime('%H:%M')}</i>")
+    lines.append(_DIVIDER)
+    lines.append(f"🕐 <i>{datetime.now().strftime('%H:%M')} itibarıyla</i>")
     await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
 
