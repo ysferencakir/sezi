@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlencode
 
 import httpx
 from loguru import logger
@@ -86,8 +87,7 @@ def build_auth_url(scopes: list[str] | None = None, state: str = "") -> str:
         "prompt": "consent",
         "state": state,
     }
-    query = "&".join(f"{k}={v}" for k, v in params.items())
-    return f"{_AUTH_URL}?{query}"
+    return f"{_AUTH_URL}?{urlencode(params)}"
 
 
 async def exchange_code(code: str) -> dict:

@@ -1,6 +1,7 @@
 import base64
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlencode
 
 import httpx
 
@@ -24,8 +25,7 @@ def build_auth_url(state: str = "") -> str:
         "scope": " ".join(SCOPES),
         "state": state,
     }
-    query = "&".join(f"{k}={v}" for k, v in params.items())
-    return f"{_AUTH_URL}?{query}"
+    return f"{_AUTH_URL}?{urlencode(params)}"
 
 
 def _basic_auth_header() -> str:

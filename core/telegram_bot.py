@@ -174,13 +174,13 @@ async def _nearby_stops(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("Yakında durak bulunamadı.")
         return
 
-    lines = ["<b>📍 Yakındaki Duraklar</b>", "<pre>"]
+    lines = ["📍 <b>Yakındaki Duraklar</b>", ""]
     for stop in stops[:5]:
         mesafe = stop.get("mesafe")
         mesafe_str = f"{mesafe:.0f} m" if mesafe is not None else "-"
-        adi = (stop.get("adi") or "")[:28]
-        lines.append(f"{adi:<28} {mesafe_str:>6}  #{stop.get('durakId')}")
-    lines.append("</pre>")
+        adi = stop.get("adi") or ""
+        lines.append(f"▫️ <b>{adi}</b>")
+        lines.append(f"    📏 {mesafe_str}  ·  #{stop.get('durakId')}")
 
     await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
@@ -204,16 +204,10 @@ def _short_mesafe(mesafe: str) -> str:
     return mesafe.replace(" metre", " m")
 
 
-def _format_arrivals_table(arrivals: list[dict]) -> str:
-    """Hat/mesafe/süreyi hizalı, monospace bir tabloya dönüştürür."""
-    header = f"{'Hat':<5}{'Mesafe':>9}   {'Süre':<10}"
-    row_lines = [header, "-" * len(header)]
-    for row in arrivals:
-        if row["at_stop"]:
-            row_lines.append(f"{row['hat']:<5}{'🔴 Durakta':>9}")
-        else:
-            row_lines.append(f"{row['hat']:<5}{_short_mesafe(row['mesafe']):>9}   {row['sure']:<10}")
-    return "<pre>" + "\n".join(row_lines) + "</pre>"
+def _format_arrival_row(row: dict) -> str:
+    if row["at_stop"]:
+        return f"    🔴 <b>Hat {row['hat']}</b> — Durakta"
+    return f"    🚍 <b>Hat {row['hat']}</b> — 📏 {_short_mesafe(row['mesafe'])} · ⏱ {row['sure']}"
 
 
 async def _send_route_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE, routes: list[dict], title: str) -> None:
@@ -226,11 +220,11 @@ async def _send_route_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE, rou
         results.append(await _fetch_route_arrivals(route))
         await asyncio.sleep(0.3)
 
-    lines = [f"<b>{title}</b>"]
+    lines = [f"<b>{title}</b>", "━━━━━━━━━━━━━━━━━━━━"]
     for route, arrivals in zip(routes, results):
-        lines.append(f"\n<b>{route['label']}</b>")
+        lines.append(f"\n📍 <b>{route['label']}</b>")
         if not arrivals:
-            lines.append("<i>Yaklaşan otobüs yok</i>")
+            lines.append("    💤 <i>Yaklaşan otobüs yok</i>")
             continue
 
         # Aynı hatta birden fazla fiziksel otobüs aynı mesafe/süreyi gösterebiliyor —
@@ -250,8 +244,9 @@ async def _send_route_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE, rou
             by_line.setdefault(row["hat_adi"], []).append(row)
 
         for hat_adi, rows in by_line.items():
-            lines.append(f"<i>{hat_adi}</i>")
-            lines.append(_format_arrivals_table(rows[:3]))
+            lines.append(f"  🚏 <i>{hat_adi}</i>")
+            for row in rows[:3]:
+                lines.append(_format_arrival_row(row))
 
     await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
