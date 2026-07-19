@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # proxy'leniyor. Boş bırakılırsa proxy kullanılmadan direkt istek atılır
     # (local geliştirmede genelde gerekmez, prod'da/Render'da gerekli).
     scraperapi_key: str = ""
+    # Health Connect köprü uygulamasının POST /api/health/ingest için kullandığı
+    # paylaşımlı sır. Boş bırakılırsa ingest endpoint'i kapalıdır (503 döner).
+    health_ingest_token: str = ""
 
     app_env: str = "development"
     log_level: str = "INFO"

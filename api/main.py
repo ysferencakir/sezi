@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from pydantic import BaseModel
 
-from api.routers import auth, context, dashboard
+from api.routers import auth, context, dashboard, ingest
 from core import module_loader, scheduler, telegram_bot
 from core.database import create_tables
 
@@ -25,6 +25,7 @@ app = FastAPI(title="Sezi", version="0.1.0", lifespan=lifespan)
 app.include_router(auth.router)
 app.include_router(context.router)
 app.include_router(dashboard.router)
+app.include_router(ingest.router)
 
 
 class ModuleInfo(BaseModel):

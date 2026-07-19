@@ -19,4 +19,9 @@ jobs:
             cd /opt/sezi
             git pull origin main
             .venv/bin/pip install -r requirements.txt
+            # HEALTH_INGEST_TOKEN secret'i tanimliysa sunucudaki .env'de olmasini garanti et
+            # (pydantic-settings .env'i calisma dizininden okur; satir varsa dokunulmaz)
+            if [ -n "${{ secrets.HEALTH_INGEST_TOKEN }}" ]; then
+              grep -q '^HEALTH_INGEST_TOKEN=' .env 2>/dev/null || echo "HEALTH_INGEST_TOKEN=${{ secrets.HEALTH_INGEST_TOKEN }}" >> .env
+            fi
             sudo systemctl restart sezi

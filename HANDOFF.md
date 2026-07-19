@@ -83,6 +83,34 @@ Kullanıcı şu anda **dashboard/frontend web sitesi** üretmek istiyor, ardınd
 
 ---
 
+## Gelecek Planı (2026-07-19'da gündeme alındı)
+
+### 1. Google Fit → yeni sağlık API'si geçişi (SON TARİH: 2026 sonu)
+
+Health modülü Google Fit REST API kullanıyor; Google bu API'yi **2026 sonuna kadar** destekleyecek (yeni kayıtlar zaten Mayıs 2024'te kapandı). Geçilmezse health modülü 2027'de veri alamaz hale gelir.
+
+**KARAR (2026-07-19):** Veri kaynağı Samsung Health → **Health Connect köprüsü** seçildi. Backend tarafı hazır: `POST /api/health/ingest` (`api/routers/ingest.py`, `X-Ingest-Token` header'ı + `HEALTH_INGEST_TOKEN` env ile korunuyor; gün upsert, uyku/nabız dedupe). Sırada: Kotlin köprü uygulaması (Health Connect SDK + WorkManager, APK sideload), sonra Fit ile paralel çalıştırma, 2026 sonundan önce Fit kapatma.
+
+**Değerlendirilen iki yol şuydu:**
+- **Google Health API** (bulut, `developers.google.com/health`) — mevcut FastAPI backend mimarisine en yakın yol (OAuth2 + REST). Dikkat: Sleep/HRV gibi veriler "restricted scope" — app verification/güvenlik incelemesi gerektirebilir; kişisel kullanımda test-mode OAuth ile yeterli olabilir, doğrulanmalı.
+- **Health Connect** (cihaz üstü, Android) — Samsung Health verisini de birleştirir (uzun süredir istenen Samsung entegrasyonunu bedavaya getirir). Ama PWA'dan erişilemez; küçük bir native Android köprü uygulaması/companion gerekir.
+
+**İzlenecek resmi sayfalar (durum kontrolü için):**
+- `https://developers.google.com/fit` — Fit deprecation duyuruları ve kapanış tarihi buradan takip edilir (ana kaynak bu)
+- `https://developers.google.com/health/migration` — Health API geçiş rehberi
+- `https://developer.android.com/health-and-fitness/health-connect/migration/fit` — Fit → Health Connect geçiş SSS'i
+
+**Önerilen zamanlama:** Eylül-Ekim 2026'da geçişe başla (yıl sonu son tarihinden önce 2-3 ay tampon); o zamana kadar çeyrekte bir yukarıdaki Fit sayfasından tarih değişikliği kontrol et.
+
+### 2. Diğer sıradaki işler (öncelik sırasıyla)
+
+1. **Query/filter endpoint'leri** — "10+ toplantılı haftaları göster" tipi sorgular; PWA'ya arama sekmesi olarak eklenebilir.
+2. **Yatırım modülü** — rapora göre: altın için goldprice.dev (spot çekirdek) + ayrı prim katmanı; TEFAS için tefas-crawler + cache; BIST için Yapı Kredi API Portal.
+3. **Banka modülü** — ertelendi (2026-07-19, veri çekme zorluğu). Gündeme gelirse: Kobaküs sandbox (`reference.kobakus.com`).
+4. **Eğlence katmanı** — digest'e NASA APOD / Wikimedia On This Day kartı (düşük maliyet, hızlı kazanım).
+
+---
+
 ## Fable 5 İçin Öneriler
 
 1. İlk iş olarak bu dosyayı ve `README.md`'yi karşılaştırıp roadmap tablosunu güncelle.
