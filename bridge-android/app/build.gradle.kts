@@ -42,6 +42,11 @@ android {
         }
     }
 
+    buildFeatures {
+        // MainActivity surumu BuildConfig.VERSION_NAME ile gosteriyor; AGP 8'de varsayilan kapali
+        buildConfig = true
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
