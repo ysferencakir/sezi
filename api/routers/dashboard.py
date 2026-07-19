@@ -7,8 +7,9 @@ from core.database import AsyncSessionFactory
 from modules.calendar.models import CalendarDay, CalendarEvent
 from modules.context.models import WeeklyContext
 from modules.currency.models import CurrencyDay
-from modules.health.models import HealthDay
+from modules.health.models import HealthDay, SleepSession
 from modules.smoking.models import SmokingDay
+from modules.spotify.models import PlayedTrack
 from modules.weather.models import WeatherDay
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
@@ -87,6 +88,130 @@ async def get_summary():
             "usd_try": currency.usd_try,
             "eur_try": currency.eur_try,
         },
+    }
+
+
+@router.get("/history")
+async def get_history(days: int = 30):
+    """Son N günün gün bazlı serileri — dashboard trend grafiklerini besler."""
+    days = max(1, min(days, 365))
+    since = date.today() - timedelta(days=days)
+
+    async with AsyncSessionFactory() as session:
+        health_rows = (
+            await session.execute(
+                select(HealthDay).where(HealthDay.day >= since).order_by(HealthDay.day)
+            )
+        ).scalars().all()
+        calendar_rows = (
+            await session.execute(
+                select(CalendarDay).where(CalendarDay.day >= since).order_by(CalendarDay.day)
+            )
+        ).scalars().all()
+        weather_rows = (
+            await session.execute(
+                select(WeatherDay).where(WeatherDay.day >= since).order_by(WeatherDay.day)
+            )
+        ).scalars().all()
+        smoking_rows = (
+            await session.execute(
+                select(SmokingDay).where(SmokingDay.day >= since).order_by(SmokingDay.day)
+            )
+        ).scalars().all()
+        currency_rows = (
+            await session.execute(
+                select(CurrencyDay).where(CurrencyDay.day >= since).order_by(CurrencyDay.day)
+            )
+        ).scalars().all()
+        # Uyku evre bazlı segmentlerden toplanır; "awake" süresi uykuya sayılmaz.
+        sleep_rows = (
+            await session.execute(
+                select(
+                    func.date(SleepSession.end_time).label("day"),
+                    func.sum(SleepSession.duration_minutes),
+                )
+                .where(
+                    func.date(SleepSession.end_time) >= since,
+                    (SleepSession.stage.is_(None)) | (SleepSession.stage != "awake"),
+                )
+                .group_by(func.date(SleepSession.end_time))
+                .order_by(func.date(SleepSession.end_time))
+            )
+        ).all()
+        spotify_rows = (
+            await session.execute(
+                select(
+                    func.date(PlayedTrack.played_at).label("day"),
+                    func.count(PlayedTrack.id),
+                )
+                .where(func.date(PlayedTrack.played_at) >= since)
+                .group_by(func.date(PlayedTrack.played_at))
+                .order_by(func.date(PlayedTrack.played_at))
+            )
+        ).all()
+
+    def iso(day) -> str:
+        return day.isoformat() if isinstance(day, date) else str(day)
+
+    return {
+        "since": since.isoformat(),
+        "health": [
+            {
+                "day": row.day.isoformat(),
+                "steps": row.steps,
+                "calories": row.calories,
+                "active_minutes": row.active_minutes,
+            }
+            for row in health_rows
+        ],
+        "sleep": [{"day": iso(day), "minutes": int(minutes)} for day, minutes in sleep_rows],
+        "calendar": [
+            {
+                "day": row.day.isoformat(),
+                "meeting_count": row.meeting_count,
+                "meeting_minutes": row.meeting_minutes,
+            }
+            for row in calendar_rows
+        ],
+        "weather": [
+            {
+                "day": row.day.isoformat(),
+                "temp_min": row.temp_min,
+                "temp_max": row.temp_max,
+                "european_aqi": row.european_aqi,
+                "precipitation_mm": row.precipitation_mm,
+            }
+            for row in weather_rows
+        ],
+        "smoking": [{"day": row.day.isoformat(), "count": row.count} for row in smoking_rows],
+        "currency": [
+            {"day": row.day.isoformat(), "usd_try": row.usd_try, "eur_try": row.eur_try}
+            for row in currency_rows
+        ],
+        "spotify": [{"day": iso(day), "plays": plays} for day, plays in spotify_rows],
+    }
+
+
+@router.get("/spotify/recent")
+async def get_recent_tracks(limit: int = 10):
+    """Son çalınan şarkılar — dashboard 'Bugün' sekmesi için."""
+    limit = max(1, min(limit, 50))
+    async with AsyncSessionFactory() as session:
+        rows = (
+            await session.execute(
+                select(PlayedTrack).order_by(PlayedTrack.played_at.desc()).limit(limit)
+            )
+        ).scalars().all()
+
+    return {
+        "tracks": [
+            {
+                "played_at": row.played_at.isoformat(),
+                "track_name": row.track_name,
+                "artist_name": row.artist_name,
+            }
+            for row in rows
+        ]
     }
 
 

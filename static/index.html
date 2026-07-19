@@ -2,88 +2,223 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#2a78d6">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon.svg">
 <title>Sezi</title>
 <style>
-  :root { color-scheme: light dark; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: #f5f5f5; color: #222; margin: 0; padding: 2rem;
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --s1: #2a78d6;
+    --s2: #008300;
+    --accent: #2a78d6;
   }
-  h1 { margin-bottom: 0.25rem; }
-  .subtitle { color: #777; margin-bottom: 2rem; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-  .card {
-    background: white; border-radius: 10px; padding: 1.25rem 1.5rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  }
-  .card h2 { margin: 0 0 0.75rem; font-size: 1rem; color: #555; }
-  .card .empty { color: #999; font-size: 0.9rem; }
-  .metric { display: flex; justify-content: space-between; padding: 0.25rem 0; font-size: 0.95rem; }
-  .metric span:first-child { color: #666; }
-  .context-entry { border-top: 1px solid #eee; padding: 0.6rem 0; }
-  .context-entry:first-child { border-top: none; }
-  .context-entry .week { font-weight: 600; font-size: 0.85rem; color: #555; }
-  .context-entry .feeling { float: right; color: #888; }
-  .modules { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-  .badge { background: #eef; color: #335; border-radius: 999px; padding: 0.3rem 0.8rem; font-size: 0.85rem; }
   @media (prefers-color-scheme: dark) {
-    body { background: #17181c; color: #eee; }
-    .card { background: #24262c; box-shadow: none; }
-    .card h2 { color: #aaa; }
-    .metric span:first-child { color: #999; }
-    .badge { background: #2c2f55; color: #cdd; }
-    .context-entry { border-color: #333; }
+    :root {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #ffffff;
+      --ink-2: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --s1: #3987e5;
+      --s2: #008300;
+      --accent: #3987e5;
+    }
   }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--page); color: var(--ink); margin: 0;
+    padding: 1.25rem 1rem calc(1.5rem + env(safe-area-inset-bottom));
+    max-width: 1100px; margin-inline: auto;
+  }
+  header { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 1rem; }
+  h1 { margin: 0; font-size: 1.5rem; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; }
+
+  nav.tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); margin-bottom: 1.25rem; }
+  nav.tabs button {
+    appearance: none; background: none; border: none; cursor: pointer;
+    font: inherit; color: var(--ink-2); padding: 0.6rem 0.9rem;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  nav.tabs button.active { color: var(--ink); font-weight: 600; border-bottom-color: var(--accent); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1.1rem 1.3rem;
+  }
+  .card h2 { margin: 0 0 0.75rem; font-size: 0.95rem; color: var(--ink-2); font-weight: 600; }
+  .card .empty { color: var(--muted); font-size: 0.9rem; }
+  .metric { display: flex; justify-content: space-between; padding: 0.22rem 0; font-size: 0.95rem; }
+  .metric span:first-child { color: var(--ink-2); }
+
+  .context-entry { border-top: 1px solid var(--grid); padding: 0.6rem 0; }
+  .context-entry:first-child { border-top: none; }
+  .context-entry .week { font-weight: 600; font-size: 0.85rem; color: var(--ink-2); }
+  .context-entry .feeling { float: right; color: var(--muted); }
+  .context-entry .events { color: var(--muted); font-size: 0.85rem; }
+
+  .modules { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .badge {
+    background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+    color: var(--ink-2); border-radius: 999px; padding: 0.3rem 0.8rem; font-size: 0.85rem;
+  }
+  .tracks li { padding: 0.2rem 0; font-size: 0.9rem; }
+  .tracks { margin: 0; padding-left: 1.1rem; }
+  .tracks .artist { color: var(--muted); }
+
+  .range-row { display: flex; gap: 0.4rem; margin-bottom: 1rem; }
+  .range-row button {
+    appearance: none; font: inherit; font-size: 0.85rem; cursor: pointer;
+    background: var(--surface); color: var(--ink-2);
+    border: 1px solid var(--border); border-radius: 999px; padding: 0.35rem 0.9rem;
+  }
+  .range-row button.active { color: var(--ink); font-weight: 600; border-color: var(--accent); }
+
+  .chart-card h2 { margin-bottom: 0.4rem; }
+  .legend { display: flex; gap: 1rem; font-size: 0.8rem; color: var(--ink-2); margin-bottom: 0.35rem; }
+  .legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 0.35rem; }
+  .chart-wrap { position: relative; }
+  .chart-wrap svg { display: block; width: 100%; height: auto; }
+  .tooltip {
+    position: absolute; pointer-events: none; display: none; z-index: 5;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.4rem 0.6rem; font-size: 0.8rem; color: var(--ink);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15); white-space: nowrap;
+  }
+  .tooltip .t-day { color: var(--muted); }
+
+  form.context-form { display: grid; gap: 0.6rem; }
+  form.context-form label { font-size: 0.85rem; color: var(--ink-2); display: grid; gap: 0.25rem; }
+  form.context-form input, form.context-form textarea {
+    font: inherit; color: var(--ink); background: var(--page);
+    border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.65rem;
+  }
+  form.context-form textarea { min-height: 5rem; resize: vertical; }
+  form.context-form button {
+    justify-self: start; font: inherit; cursor: pointer;
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 0.5rem 1.1rem; font-weight: 600;
+  }
+  .form-status { font-size: 0.85rem; color: var(--ink-2); }
+  .hidden { display: none !important; }
 </style>
 </head>
 <body>
-  <h1>Sezi</h1>
-  <p class="subtitle">Kişisel yaşam yansıma paneli — placeholder</p>
+  <header>
+    <h1>Sezi</h1>
+    <span class="subtitle">Kişisel yaşam yansıma paneli</span>
+  </header>
 
-  <div class="grid">
-    <div class="card">
-      <h2>Sağlık (son gün)</h2>
-      <div id="health-card"><span class="empty">Yükleniyor…</span></div>
-    </div>
-    <div class="card">
-      <h2>Takvim (son gün)</h2>
-      <div id="calendar-card"><span class="empty">Yükleniyor…</span></div>
-    </div>
-    <div class="card">
-      <h2>Hava Durumu (son gün)</h2>
-      <div id="weather-card"><span class="empty">Yükleniyor…</span></div>
-    </div>
-    <div class="card">
-      <h2>Sigara (son gün)</h2>
-      <div id="smoking-card"><span class="empty">Yükleniyor…</span></div>
-    </div>
-    <div class="card">
-      <h2>Döviz Kurları (son gün)</h2>
-      <div id="currency-card"><span class="empty">Yükleniyor…</span></div>
-    </div>
-    <div class="card">
-      <h2>Aktif Modüller</h2>
-      <div id="modules-card" class="modules"><span class="empty">Yükleniyor…</span></div>
-    </div>
-  </div>
+  <nav class="tabs">
+    <button data-tab="today" class="active">Bugün</button>
+    <button data-tab="trends">Trendler</button>
+    <button data-tab="reflect">Yansıma</button>
+  </nav>
 
-  <div class="card">
-    <h2>Haftalık Yansıma Notları</h2>
-    <div id="context-card"><span class="empty">Yükleniyor…</span></div>
-  </div>
+  <!-- ══ Bugün ══ -->
+  <section id="tab-today">
+    <div class="grid">
+      <div class="card"><h2>Sağlık (son gün)</h2><div id="health-card"><span class="empty">Yükleniyor…</span></div></div>
+      <div class="card"><h2>Takvim (son gün)</h2><div id="calendar-card"><span class="empty">Yükleniyor…</span></div></div>
+      <div class="card"><h2>Hava Durumu (son gün)</h2><div id="weather-card"><span class="empty">Yükleniyor…</span></div></div>
+      <div class="card"><h2>Sigara (son gün)</h2><div id="smoking-card"><span class="empty">Yükleniyor…</span></div></div>
+      <div class="card"><h2>Döviz Kurları (son gün)</h2><div id="currency-card"><span class="empty">Yükleniyor…</span></div></div>
+      <div class="card"><h2>Son Çalınanlar</h2><div id="spotify-card"><span class="empty">Yükleniyor…</span></div></div>
+      <div class="card"><h2>Aktif Modüller</h2><div id="modules-card" class="modules"><span class="empty">Yükleniyor…</span></div></div>
+    </div>
+  </section>
+
+  <!-- ══ Trendler ══ -->
+  <section id="tab-trends" class="hidden">
+    <div class="range-row" id="range-row">
+      <button data-days="7">7 gün</button>
+      <button data-days="30" class="active">30 gün</button>
+      <button data-days="90">90 gün</button>
+    </div>
+    <div class="grid" id="charts-grid"></div>
+  </section>
+
+  <!-- ══ Yansıma ══ -->
+  <section id="tab-reflect" class="hidden">
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+      <div class="card">
+        <h2>Yeni Haftalık Not</h2>
+        <form class="context-form" id="context-form">
+          <label>Hafta başlangıcı (Pazartesi)
+            <input type="date" name="week_start" required>
+          </label>
+          <label>Notlar
+            <textarea name="notes" required placeholder="Bu hafta neler oldu?"></textarea>
+          </label>
+          <label>Özel olaylar (opsiyonel)
+            <input type="text" name="special_events" placeholder="Seyahat, hastalık, bayram…">
+          </label>
+          <label>Genel his (1–10, opsiyonel)
+            <input type="number" name="general_feeling" min="1" max="10">
+          </label>
+          <button type="submit">Kaydet</button>
+          <span class="form-status" id="form-status"></span>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Geçmiş Notlar (son 12 hafta)</h2>
+        <div id="reflect-list"><span class="empty">Yükleniyor…</span></div>
+      </div>
+    </div>
+  </section>
 
 <script>
+"use strict";
+
+/* ── yardımcılar ─────────────────────────────────────────── */
 async function fetchJSON(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(url + " -> " + res.status);
   return res.json();
 }
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const metric = (label, value) =>
+  `<div class="metric"><span>${label}</span><span>${value}</span></div>`;
+const fmtDay = (iso) => {
+  const [y, m, d] = iso.split("-");
+  return `${d}.${m}`;
+};
 
-function metric(label, value) {
-  return `<div class="metric"><span>${label}</span><span>${value}</span></div>`;
+/* ── sekmeler ────────────────────────────────────────────── */
+const sections = { today: "tab-today", trends: "tab-trends", reflect: "tab-reflect" };
+function activateTab(tab) {
+  if (!sections[tab]) tab = "today";
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  for (const [t, id] of Object.entries(sections)) {
+    document.getElementById(id).classList.toggle("hidden", t !== tab);
+  }
+  history.replaceState(null, "", tab === "today" ? location.pathname : "#" + tab);
+  if (tab === "trends" && !trendsLoaded) loadTrends(currentDays);
+  if (tab === "reflect") loadReflections();
 }
+document.querySelectorAll("nav.tabs button").forEach((btn) => {
+  btn.addEventListener("click", () => activateTab(btn.dataset.tab));
+});
 
+/* ── Bugün ───────────────────────────────────────────────── */
 async function loadSummary() {
   try {
     const data = await fetchJSON("/api/summary");
@@ -113,12 +248,7 @@ async function loadSummary() {
         + metric("Sıcaklık", `${data.weather.temp_min ?? "-"}° / ${data.weather.temp_max ?? "-"}°C`)
         + metric("Yağış", (data.weather.precipitation_mm ?? 0) + " mm")
         + metric("Hava Kalitesi (AQI)", data.weather.european_aqi ?? "-")
-        + metric("PM2.5 / PM10", `${data.weather.pm2_5 ?? "-"} / ${data.weather.pm10 ?? "-"}`)
         + metric("UV endeksi", data.weather.uv_index_max ?? "-")
-        + metric("Gün ışığı süresi", data.weather.day_length_minutes ? (data.weather.day_length_minutes / 60).toFixed(1) + " saat" : "-")
-        + metric("Gün doğumu / batımı", data.weather.sunrise && data.weather.sunset
-            ? `${new Date(data.weather.sunrise).toLocaleTimeString("tr-TR", {hour:"2-digit", minute:"2-digit", timeZone:"UTC"})} / ${new Date(data.weather.sunset).toLocaleTimeString("tr-TR", {hour:"2-digit", minute:"2-digit", timeZone:"UTC"})} UTC`
-            : "-")
       : '<span class="empty">Henüz veri yok — bota Telegram üzerinden konum paylaş</span>';
 
     const s = document.getElementById("smoking-card");
@@ -132,35 +262,290 @@ async function loadSummary() {
         + metric("USD/TRY", data.currency.usd_try?.toFixed(2) ?? "-")
         + metric("EUR/TRY", data.currency.eur_try?.toFixed(2) ?? "-")
       : '<span class="empty">Henüz veri yok</span>';
+  } catch (e) { console.error(e); }
+}
 
-    const ctx = document.getElementById("context-card");
-    ctx.innerHTML = data.context.length
-      ? data.context.map(row => `
-          <div class="context-entry">
-            <span class="week">${row.week_start}</span>
-            <span class="feeling">${row.general_feeling ? row.general_feeling + "/10" : ""}</span>
-            <div>${row.notes || ""}</div>
-            ${row.special_events ? `<div style="color:#888;font-size:0.85rem;">${row.special_events}</div>` : ""}
-          </div>
-        `).join("")
-      : '<span class="empty">Henüz not yok — bota /context yaz</span>';
-  } catch (e) {
-    console.error(e);
-  }
+async function loadSpotify() {
+  try {
+    const data = await fetchJSON("/api/spotify/recent?limit=8");
+    const el = document.getElementById("spotify-card");
+    el.innerHTML = data.tracks.length
+      ? `<ul class="tracks">${data.tracks.map((t) =>
+          `<li>${esc(t.track_name)} <span class="artist">— ${esc(t.artist_name)}</span></li>`).join("")}</ul>`
+      : '<span class="empty">Henüz veri yok</span>';
+  } catch (e) { console.error(e); }
 }
 
 async function loadModules() {
   try {
     const modules = await fetchJSON("/modules");
-    const m = document.getElementById("modules-card");
-    m.innerHTML = modules.map(mod => `<span class="badge">${mod.name} (${mod.schedule_count})</span>`).join("");
+    document.getElementById("modules-card").innerHTML =
+      modules.map((m) => `<span class="badge">${esc(m.name)} (${m.schedule_count})</span>`).join("");
+  } catch (e) { console.error(e); }
+}
+
+/* ── grafik motoru (bağımlılıksız SVG) ───────────────────── */
+const W = 600, H = 190, PAD = { t: 10, r: 12, b: 24, l: 44 };
+
+function niceTicks(min, max) {
+  if (min === max) { min = Math.min(0, min); max = max + 1; }
+  const span = max - min;
+  const step = Math.pow(10, Math.floor(Math.log10(span / 3)));
+  const err = span / 3 / step;
+  const mult = err >= 7.5 ? 10 : err >= 3.5 ? 5 : err >= 1.5 ? 2 : 1;
+  const s = step * mult;
+  const lo = Math.floor(min / s) * s, hi = Math.ceil(max / s) * s;
+  const ticks = [];
+  for (let v = lo; v <= hi + s / 2; v += s) ticks.push(+v.toFixed(6));
+  return { lo, hi, ticks };
+}
+
+// series: [{name, color, values: (number|null)[]}]; days: ISO string[]
+function renderChart(container, { type, days, series, fmt = (v) => v.toLocaleString("tr-TR"), zeroBase = true }) {
+  container.innerHTML = "";
+  const all = series.flatMap((s) => s.values).filter((v) => v != null);
+  if (!all.length) {
+    container.innerHTML = '<span class="empty">Bu aralıkta veri yok</span>';
+    return;
+  }
+  let vMin = Math.min(...all), vMax = Math.max(...all);
+  if (zeroBase) vMin = Math.min(0, vMin);
+  const { lo, hi, ticks } = niceTicks(vMin, vMax);
+
+  const pw = W - PAD.l - PAD.r, ph = H - PAD.t - PAD.b;
+  const y = (v) => PAD.t + ph - ((v - lo) / (hi - lo)) * ph;
+  const n = days.length;
+  const x = (i) => PAD.l + (n === 1 ? pw / 2 : (i / (n - 1)) * pw);
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  let g = "";
+
+  // ızgara + y etiketleri (sessiz, kesikli değil, hairline)
+  for (const t of ticks) {
+    g += `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)" stroke-width="1"/>`;
+    g += `<text x="${PAD.l - 6}" y="${y(t) + 3}" text-anchor="end" font-size="10" fill="var(--muted)">${fmt(t)}</text>`;
+  }
+  // taban çizgisi
+  g += `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${y(lo)}" y2="${y(lo)}" stroke="var(--baseline)" stroke-width="1"/>`;
+  // x etiketleri: ilk / orta / son
+  for (const i of [...new Set([0, Math.floor((n - 1) / 2), n - 1])]) {
+    g += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" font-size="10" fill="var(--muted)">${fmtDay(days[i])}</text>`;
+  }
+
+  if (type === "bar") {
+    const s = series[0];
+    const bw = Math.max(2, Math.min(18, pw / n - 2)); // 2px yüzey boşluğu
+    for (let i = 0; i < n; i++) {
+      const v = s.values[i];
+      if (v == null) continue;
+      const bx = x(i) - bw / 2, by = y(Math.max(v, 0)), bh = Math.max(1, Math.abs(y(v) - y(0)) || 1);
+      const r = Math.min(4, bw / 2, bh); // veri ucu yuvarlak, taban düz
+      g += `<path d="M${bx},${by + bh} V${by + r} Q${bx},${by} ${bx + r},${by} H${bx + bw - r} Q${bx + bw},${by} ${bx + bw},${by + r} V${by + bh} Z" fill="${s.color}"/>`;
+    }
+  } else {
+    for (const s of series) {
+      let d = "", pen = false;
+      for (let i = 0; i < n; i++) {
+        const v = s.values[i];
+        if (v == null) { pen = false; continue; }
+        d += (pen ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1);
+        pen = true;
+      }
+      g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+      // tek noktalı segmentler görünür kalsın
+      for (let i = 0; i < n; i++) {
+        const v = s.values[i];
+        if (v != null && (i === 0 || s.values[i - 1] == null) && (i === n - 1 || s.values[i + 1] == null)) {
+          g += `<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="${s.color}"/>`;
+        }
+      }
+      // seri ucu doğrudan etiket (yalnız çok serili grafikte)
+      if (series.length > 1) {
+        const last = [...s.values].reverse().findIndex((v) => v != null);
+        if (last !== -1) {
+          const i = n - 1 - last;
+          g += `<text x="${Math.min(x(i) + 4, W - 2)}" y="${y(s.values[i]) - 5}" font-size="10" fill="var(--ink-2)">${esc(s.name)}</text>`;
+        }
+      }
+    }
+  }
+
+  // hover katmanı
+  g += `<line id="xh" y1="${PAD.t}" y2="${PAD.t + ph}" stroke="var(--baseline)" stroke-width="1" visibility="hidden"/>`;
+  svg.innerHTML = g;
+
+  const tip = document.createElement("div");
+  tip.className = "tooltip";
+  container.append(svg, tip);
+
+  const xh = svg.querySelector("#xh");
+  svg.addEventListener("mousemove", (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const sx = ((ev.clientX - rect.left) / rect.width) * W;
+    const i = Math.max(0, Math.min(n - 1, Math.round(((sx - PAD.l) / pw) * (n - 1))));
+    xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i));
+    xh.setAttribute("visibility", "visible");
+    const rows = series
+      .map((s) => s.values[i] == null ? "" :
+        `<div><span class="dot" style="background:${s.color};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>${esc(s.name)}: <strong>${fmt(s.values[i])}</strong></div>`)
+      .join("");
+    tip.innerHTML = `<div class="t-day">${fmtDay(days[i])}</div>${rows || "<div>veri yok</div>"}`;
+    tip.style.display = "block";
+    const px = (x(i) / W) * rect.width;
+    tip.style.left = Math.min(px + 10, rect.width - tip.offsetWidth - 4) + "px";
+    tip.style.top = "8px";
+  });
+  svg.addEventListener("mouseleave", () => {
+    tip.style.display = "none";
+    xh.setAttribute("visibility", "hidden");
+  });
+}
+
+/* ── Trendler ────────────────────────────────────────────── */
+let trendsLoaded = false;
+let currentDays = 30;
+
+document.querySelectorAll("#range-row button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#range-row button").forEach((b) => b.classList.toggle("active", b === btn));
+    currentDays = +btn.dataset.days;
+    loadTrends(currentDays);
+  });
+});
+
+function dayRange(sinceISO) {
+  const days = [];
+  const d = new Date(sinceISO + "T00:00:00");
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  while (d <= today) {
+    days.push(d.toISOString().slice(0, 10));
+    d.setDate(d.getDate() + 1);
+  }
+  return days;
+}
+const indexBy = (rows) => Object.fromEntries(rows.map((r) => [r.day, r]));
+
+async function loadTrends(rangeDays) {
+  const grid = document.getElementById("charts-grid");
+  try {
+    const data = await fetchJSON(`/api/history?days=${rangeDays}`);
+    trendsLoaded = true;
+    const days = dayRange(data.since);
+    const pick = (rows, key) => {
+      const byDay = indexBy(rows);
+      return days.map((d) => byDay[d]?.[key] ?? null);
+    };
+
+    const charts = [
+      { title: "Adım", type: "bar", series: [{ name: "Adım", color: "var(--s1)", values: pick(data.health, "steps") }] },
+      { title: "Uyku (saat)", type: "bar", fmt: (v) => (+v).toFixed(1),
+        series: [{ name: "Uyku", color: "var(--s1)", values: pick(data.sleep, "minutes").map((v) => v == null ? null : v / 60) }] },
+      { title: "Aktif Dakika", type: "line",
+        series: [{ name: "Aktif dakika", color: "var(--s1)", values: pick(data.health, "active_minutes") }] },
+      { title: "Toplantı Sayısı", type: "bar",
+        series: [{ name: "Toplantı", color: "var(--s1)", values: pick(data.calendar, "meeting_count") }] },
+      { title: "Sigara (adet)", type: "bar",
+        series: [{ name: "Sigara", color: "var(--s1)", values: pick(data.smoking, "count") }] },
+      { title: "Döviz (TRY)", type: "line", zeroBase: false, fmt: (v) => (+v).toFixed(1), legend: true,
+        series: [
+          { name: "USD", color: "var(--s1)", values: pick(data.currency, "usd_try") },
+          { name: "EUR", color: "var(--s2)", values: pick(data.currency, "eur_try") },
+        ] },
+      { title: "Sıcaklık (°C)", type: "line", zeroBase: false, legend: true,
+        series: [
+          { name: "Maks", color: "var(--s1)", values: pick(data.weather, "temp_max") },
+          { name: "Min", color: "var(--s2)", values: pick(data.weather, "temp_min") },
+        ] },
+      { title: "Hava Kalitesi (AQI)", type: "line",
+        series: [{ name: "AQI", color: "var(--s1)", values: pick(data.weather, "european_aqi") }] },
+      { title: "Spotify (çalma)", type: "bar",
+        series: [{ name: "Çalma", color: "var(--s1)", values: pick(data.spotify, "plays") }] },
+    ];
+
+    grid.innerHTML = "";
+    for (const c of charts) {
+      const card = document.createElement("div");
+      card.className = "card chart-card";
+      const legend = c.legend
+        ? `<div class="legend">${c.series.map((s) =>
+            `<span><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</span>`).join("")}</div>`
+        : "";
+      card.innerHTML = `<h2>${esc(c.title)}</h2>${legend}<div class="chart-wrap"></div>`;
+      grid.append(card);
+      renderChart(card.querySelector(".chart-wrap"), { days, ...c });
+    }
   } catch (e) {
     console.error(e);
+    grid.innerHTML = '<div class="card"><span class="empty">Trend verisi yüklenemedi</span></div>';
   }
 }
 
+/* ── Yansıma ─────────────────────────────────────────────── */
+function mondayOfThisWeek() {
+  const d = new Date();
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
+document.querySelector('#context-form [name="week_start"]').value = mondayOfThisWeek();
+
+async function loadReflections() {
+  const el = document.getElementById("reflect-list");
+  try {
+    const since = new Date();
+    since.setDate(since.getDate() - 12 * 7);
+    const data = await fetchJSON("/api/context?week_start=" + since.toISOString().slice(0, 10));
+    el.innerHTML = data.context.length
+      ? data.context.map((row) => `
+          <div class="context-entry">
+            <span class="week">${row.week_start}</span>
+            <span class="feeling">${row.general_feeling ? row.general_feeling + "/10" : ""}</span>
+            <div>${esc(row.notes || "")}</div>
+            ${row.special_events ? `<div class="events">${esc(row.special_events)}</div>` : ""}
+          </div>`).join("")
+      : '<span class="empty">Henüz not yok</span>';
+  } catch (e) {
+    console.error(e);
+    el.innerHTML = '<span class="empty">Notlar yüklenemedi</span>';
+  }
+}
+
+document.getElementById("context-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const form = ev.target;
+  const status = document.getElementById("form-status");
+  const body = {
+    week_start: form.week_start.value,
+    notes: form.notes.value,
+    special_events: form.special_events.value || null,
+    general_feeling: form.general_feeling.value ? +form.general_feeling.value : null,
+  };
+  status.textContent = "Kaydediliyor…";
+  try {
+    const res = await fetch("/api/context", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error("POST /api/context -> " + res.status);
+    status.textContent = "Kaydedildi ✓";
+    form.notes.value = ""; form.special_events.value = ""; form.general_feeling.value = "";
+    loadReflections();
+  } catch (e) {
+    console.error(e);
+    status.textContent = "Kaydedilemedi — tekrar dene";
+  }
+});
+
+/* ── başlat ──────────────────────────────────────────────── */
 loadSummary();
+loadSpotify();
 loadModules();
+activateTab(location.hash.replace("#", "") || "today");
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch((e) => console.warn("SW kaydı başarısız", e));
+}
 </script>
 </body>
 </html>

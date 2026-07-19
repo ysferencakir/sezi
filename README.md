@@ -26,12 +26,12 @@ Sezi collects data from multiple sources and stores it in a personal database, e
 ## Technical Stack
 
 - **Backend:** FastAPI (Python async)
-- **Database:** PostgreSQL on Neon
-- **Scheduling:** APScheduler (cron-based)
-- **Data Collection:** Google Fit API
-- **Notifications:** ntfy.sh
-- **Deployment:** Render.com (free tier)
-- **Cost:** $0/month
+- **Database:** PostgreSQL
+- **Scheduling:** APScheduler (cron-based, Europe/Istanbul)
+- **Data Collection:** Google Fit, Google Calendar, Spotify, Open-Meteo, Frankfurter, ESHOT (İzmir transit)
+- **Notifications:** Telegram bot + ntfy.sh fallback
+- **Frontend:** Vanilla PWA served by FastAPI (`static/`)
+- **Deployment:** Self-hosted VPS (Render.com was the earlier target — see `DEPLOYMENT.md`)
 
 ---
 
@@ -310,15 +310,22 @@ Sezi has built-in guardrails:
 
 ## Future Roadmap
 
-### Status (as of 2026-07-13)
+### Status (as of 2026-07-19 — see `HANDOFF.md` for the living overview)
 - [x] Core infra: scheduler, database, notifier (ntfy.sh + Telegram), dynamic module loader
 - [x] Health module (Google Fit: steps/heart rate/sleep, OAuth, daily sync + morning report)
-- [x] Calendar module (Google Calendar: daily meeting count/minutes/busiest hour/longest free block, shared Google OAuth token, daily sync + morning report)
-- [x] Context module (weekly reflection: `POST/GET /api/context`, Sunday 18:00 reminder notification)
-- [ ] Bank/finance module — not started
+- [x] Calendar module (Google Calendar: meeting stats, categories, holidays)
+- [x] Context module (weekly reflection: `POST/GET /api/context`, Sunday 18:00 reminder)
+- [x] Currency module (Frankfurter API: USD/EUR/GBP/CHF → TRY)
+- [x] Weather module (Open-Meteo: weather, air quality, sun times, location service)
+- [x] Smoking module (habit tracking via Telegram)
+- [x] Spotify module (recently played tracks, OAuth)
+- [x] Notion module (daily summaries to a Notion database)
+- [x] Digest module (consolidated morning/evening summaries)
+- [x] Transit module (İzmir ESHOT bus/stop scraping, arrivals, proximity icons)
+- [x] Web dashboard (PWA served from `static/`, installable on Android)
+- [ ] Bank/finance module — postponed (data access is hard; Nordigen evaluated)
 - [ ] Investment module — not started
 - [ ] Query/filter endpoints — not started
-- [ ] React dashboard — not started
 - [ ] Email digest — not started
 - [ ] Samsung Health / Health Connect integration (replace Google Fit) — not started
 
