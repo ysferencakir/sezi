@@ -123,7 +123,10 @@ jobs:
           release_apk="sezi-bridge-v${VERSION}.apk"
           test -f "$source_apk"
           cp "$source_apk" "$release_apk"
-          apksigner verify --verbose --print-certs "$release_apk"
+          # apksigner build-tools içindedir, runner PATH'inde olmayabilir
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          command -v apksigner >/dev/null 2>&1 && APKSIGNER=apksigner
+          "$APKSIGNER" verify --verbose --print-certs "$release_apk"
           sha256sum "$release_apk" > "${release_apk}.sha256"
           echo "path=$release_apk" >> "$GITHUB_OUTPUT"
           echo "checksum=${release_apk}.sha256" >> "$GITHUB_OUTPUT"

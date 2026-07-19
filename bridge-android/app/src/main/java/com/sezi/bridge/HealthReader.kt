@@ -148,8 +148,12 @@ class HealthReader(context: Context) {
             HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
     }
 
-    suspend fun hasAllPermissions(): Boolean =
-        client.permissionController.getGrantedPermissions().containsAll(PERMISSIONS)
+    suspend fun hasAllPermissions(): Boolean {
+        // Arka plan okuma izni cihaza göre reddedilebilir; onu zorunlu sayma —
+        // yoksa yalnızca arka plan senkronu etkilenir, ön plan "Şimdi Gönder" çalışır.
+        val required = PERMISSIONS - HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
+        return client.permissionController.getGrantedPermissions().containsAll(required)
+    }
 
     /** Son [days] günün verisini ingest payload'ı (JSON) olarak toplar. */
     suspend fun buildPayload(days: Int): JSONObject {

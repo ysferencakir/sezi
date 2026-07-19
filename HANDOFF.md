@@ -89,7 +89,13 @@ Kullanıcı şu anda **dashboard/frontend web sitesi** üretmek istiyor, ardınd
 
 Health modülü Google Fit REST API kullanıyor; Google bu API'yi **2026 sonuna kadar** destekleyecek (yeni kayıtlar zaten Mayıs 2024'te kapandı). Geçilmezse health modülü 2027'de veri alamaz hale gelir.
 
-**KARAR (2026-07-19):** Veri kaynağı Samsung Health → **Health Connect köprüsü** seçildi. Backend tarafı hazır: `POST /api/health/ingest` (`api/routers/ingest.py`, `X-Ingest-Token` header'ı + `HEALTH_INGEST_TOKEN` env ile korunuyor; gün upsert, uyku/nabız dedupe). Sırada: Kotlin köprü uygulaması (Health Connect SDK + WorkManager, APK sideload), sonra Fit ile paralel çalıştırma, 2026 sonundan önce Fit kapatma.
+**KARAR (2026-07-19):** Veri kaynağı Samsung Health → **Health Connect köprüsü** seçildi. Backend tarafı hazır: `POST /api/health/ingest` (`api/routers/ingest.py`, `X-Ingest-Token` header'ı + `HEALTH_INGEST_TOKEN` env ile korunuyor; gün upsert, uyku/nabız dedupe, `health_records` ham veri deposu toplu upsert).
+
+**DURUM (2026-07-19 akşamı): Köprü CANLI ve veri akıyor** — `bridge-android/` uygulaması telefonda kurulu, `health_records`'ta 1400+ ham kayıt (Steps/Speed/Distance/Calories/HeartRate/ExerciseSession). Kalanlar:
+
+- [ ] **Uyku akmıyor** — Samsung Health → Health Connect uyku paylaşımı ve Sezi Bridge uyku izni kontrol edilecek (`sleep_sessions` hâlâ boş)
+- [ ] 6 saatlik arka plan senkronunun çalıştığını teyit et (uygulamadaki "Son senkron" saati)
+- [ ] Fit ile paralel dönem (birkaç hafta) → veriler tutarlıysa 2026 sonundan önce Fit schedule'ını kapat
 
 **Değerlendirilen iki yol şuydu:**
 - **Google Health API** (bulut, `developers.google.com/health`) — mevcut FastAPI backend mimarisine en yakın yol (OAuth2 + REST). Dikkat: Sleep/HRV gibi veriler "restricted scope" — app verification/güvenlik incelemesi gerektirebilir; kişisel kullanımda test-mode OAuth ile yeterli olabilir, doğrulanmalı.

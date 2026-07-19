@@ -73,7 +73,11 @@ class MainActivity : AppCompatActivity() {
         })
         root.addView(Button(this).apply {
             text = "Şimdi Gönder (son 3 gün)"
-            setOnClickListener { syncNow() }
+            setOnClickListener { syncNow(3) }
+        })
+        root.addView(Button(this).apply {
+            text = "Geçmişi Gönder (son 30 gün)"
+            setOnClickListener { syncNow(30) }
         })
 
         status = TextView(this).apply {
@@ -105,7 +109,7 @@ class MainActivity : AppCompatActivity() {
         setStatus("Kaydedildi — arka plan senkronu kuruldu (6 saatte bir)")
     }
 
-    private fun syncNow() {
+    private fun syncNow(days: Int) {
         val prefs = getSharedPreferences(SyncWorker.PREFS, Context.MODE_PRIVATE)
         val url = prefs.getString(SyncWorker.KEY_URL, null)
         val token = prefs.getString(SyncWorker.KEY_TOKEN, null)
@@ -122,7 +126,7 @@ class MainActivity : AppCompatActivity() {
                     return@launch
                 }
                 val result = withContext(Dispatchers.IO) {
-                    val payload = reader.buildPayload(days = 3)
+                    val payload = reader.buildPayload(days = days)
                     ApiClient.postIngest(url, token, payload)
                 }
                 setStatus("Gönderildi ✓\n$result")

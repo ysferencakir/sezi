@@ -12,6 +12,8 @@ graphify-out/
 bridge-android/.gradle/
 bridge-android/.idea/
 bridge-android/local.properties
+bridge-android/signing-secrets.local.txt
+bridge-android/*.jks
 bridge-android/**/build/
 # Android release imza anahtarları kesinlikle repoya girmez
 *.jks
