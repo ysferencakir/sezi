@@ -36,9 +36,14 @@ jobs:
         working-directory: bridge-android
         run: |
           if [ ! -f ./gradlew ]; then
+            echo "gradlew missing, generating wrapper"
             gradle wrapper --gradle-version 8.11.1
+          else
+            echo "gradlew already present"
           fi
+          ls -la ./gradlew || true
           chmod +x ./gradlew
+          ls -la ./gradlew
 
       - name: Build debug APK
         working-directory: bridge-android
