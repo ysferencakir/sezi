@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace = "com.sezi.bridge"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.sezi.bridge"
         minSdk = 28
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "0.1"
     }
