@@ -1,13 +1,13 @@
 {
   "name": "Sezi",
   "short_name": "Sezi",
-  "description": "Kişisel yaşam yansıma paneli",
+  "description": "Sezi — sağlık ve yaşam verilerinin sakin, anlaşılır özeti.",
   "lang": "tr",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f9f9f7",
-  "theme_color": "#2a78d6",
+  "background_color": "#f3f7f4",
+  "theme_color": "#1f6b57",
   "icons": [
     { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }

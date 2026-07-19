@@ -1,6 +1,6 @@
 // Sezi PWA service worker.
 // Kabuk (shell) cache-first; /api her zaman ağdan gelir — bayat veri gösterilmez.
-const CACHE = "sezi-shell-v2";
+const CACHE = "sezi-shell-v3";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {

@@ -93,7 +93,7 @@ Health modülü Google Fit REST API kullanıyor; Google bu API'yi **2026 sonuna 
 
 **DURUM (2026-07-19 akşamı): Köprü CANLI ve veri akıyor** — `bridge-android/` uygulaması telefonda kurulu, `health_records`'ta 1400+ ham kayıt (Steps/Speed/Distance/Calories/HeartRate/ExerciseSession). Kalanlar:
 
-- [ ] **Uyku akmıyor** — Samsung Health → Health Connect uyku paylaşımı ve Sezi Bridge uyku izni kontrol edilecek (`sleep_sessions` hâlâ boş)
+- [x] **Uyku çözüldü** (2026-07-19) — veri vardı ama 3 günlük pencerenin dışındaydı; "Geçmişi Gönder (30 gün)" ile 210 evre kaydı geldi (son uyku 15 Temmuz — saatle uyunmayan gecelerde veri oluşmaz)
 - [ ] 6 saatlik arka plan senkronunun çalıştığını teyit et (uygulamadaki "Son senkron" saati)
 - [ ] Fit ile paralel dönem (birkaç hafta) → veriler tutarlıysa 2026 sonundan önce Fit schedule'ını kapat
 
