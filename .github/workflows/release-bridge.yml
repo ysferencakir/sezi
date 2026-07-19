@@ -111,7 +111,14 @@ jobs:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/sezi-release.jks
           SEZI_VERSION_NAME: ${{ steps.version.outputs.name }}
           SEZI_VERSION_CODE: ${{ steps.version.outputs.code }}
-        run: ./gradlew assembleRelease --no-daemon
+        shell: bash
+        run: |
+          # Secret'lar panodan yapistirilirken gorunmez unicode karakterler
+          # bulasabiliyor ("Password is not ASCII"); yazdirilabilir ASCII disini ayikla.
+          export ANDROID_KEYSTORE_PASSWORD=$(printf '%s' "$ANDROID_KEYSTORE_PASSWORD" | tr -cd '\41-\176')
+          export ANDROID_KEY_PASSWORD=$(printf '%s' "$ANDROID_KEY_PASSWORD" | tr -cd '\41-\176')
+          export ANDROID_KEY_ALIAS=$(printf '%s' "$ANDROID_KEY_ALIAS" | tr -cd '\41-\176')
+          ./gradlew assembleRelease --no-daemon
 
       - name: Verify signature and prepare release files
         id: apk
