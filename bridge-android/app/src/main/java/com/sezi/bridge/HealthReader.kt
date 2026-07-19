@@ -3,12 +3,25 @@ package com.sezi.bridge
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.BloodGlucoseRecord
+import androidx.health.connect.client.records.BloodPressureRecord
+import androidx.health.connect.client.records.BodyFatRecord
+import androidx.health.connect.client.records.BodyTemperatureRecord
 import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
+import androidx.health.connect.client.records.FloorsClimbedRecord
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
+import androidx.health.connect.client.records.HeightRecord
+import androidx.health.connect.client.records.HydrationRecord
+import androidx.health.connect.client.records.OxygenSaturationRecord
+import androidx.health.connect.client.records.RespiratoryRateRecord
+import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
+import androidx.health.connect.client.records.Vo2MaxRecord
+import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -32,6 +45,19 @@ class HealthReader(context: Context) {
             HealthPermission.getReadPermission(ExerciseSessionRecord::class),
             HealthPermission.getReadPermission(SleepSessionRecord::class),
             HealthPermission.getReadPermission(HeartRateRecord::class),
+            HealthPermission.getReadPermission(WeightRecord::class),
+            HealthPermission.getReadPermission(HeightRecord::class),
+            HealthPermission.getReadPermission(BodyFatRecord::class),
+            HealthPermission.getReadPermission(BloodGlucoseRecord::class),
+            HealthPermission.getReadPermission(BloodPressureRecord::class),
+            HealthPermission.getReadPermission(OxygenSaturationRecord::class),
+            HealthPermission.getReadPermission(HydrationRecord::class),
+            HealthPermission.getReadPermission(RestingHeartRateRecord::class),
+            HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
+            HealthPermission.getReadPermission(RespiratoryRateRecord::class),
+            HealthPermission.getReadPermission(Vo2MaxRecord::class),
+            HealthPermission.getReadPermission(FloorsClimbedRecord::class),
+            HealthPermission.getReadPermission(BodyTemperatureRecord::class),
         )
 
         fun sdkAvailable(context: Context): Boolean =
@@ -85,7 +111,101 @@ class HealthReader(context: Context) {
             // Hiç metrik yoksa günü gönderme (boş gün, sunucudaki veriyi ezmesin)
             if (day.length() > 1) arr.put(day)
         }
+
+        enrichDailyRecords(arr, start, end, zone)
         return arr
+    }
+
+    private suspend fun enrichDailyRecords(arr: JSONArray, start: Instant, end: Instant, zone: ZoneId) {
+        fun attachValue(dayKey: String, key: String, value: Any?) {
+            if (value == null) return
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                if (obj.optString("day") == dayKey) {
+                    obj.put(key, value)
+                    return
+                }
+            }
+        }
+
+        val weightRecords = client.readRecords(ReadRecordsRequest(WeightRecord::class, TimeRangeFilter.between(start, end))).records
+        for (record in weightRecords) {
+            val dayKey = record.time.atZone(zone).toLocalDate().toString()
+            attachValue(dayKey, "weight_kg", record.weight.inKilograms)
+        }
+
+        val heightRecords = client.readRecords(ReadRecordsRequest(HeightRecord::class, TimeRangeFilter.between(start, end))).records
+        for (record in heightRecords) {
+            val dayKey = record.time.atZone(zone).toLocalDate().toString()
+            attachValue(dayKey, "height_cm", record.height.inMeters * 100.0)
+        }
+
+        val bodyFatRecords = client.readRecords(ReadRecordsRequest(BodyFatRecord::class, TimeRangeFilter.between(start, end))).records
+        for (record in bodyFatRecords) {
+            val dayKey = record.time.atZone(zone).toLocalDate().toString()
+            attachValue(dayKey, "body_fat_percent", record.percentage.inPercent)
+        }
+
+        val bloodGlucoseRecords = client.readRecords(ReadRecordsRequest(BloodGlucoseRecord::class, TimeRangeFilter.between(start, end))).records
+        for (record in bloodGlucoseRecords) {
+            val dayKey = record.time.atZone(zone).toLocalDate().toString()
+            attachValue(dayKey, "blood_glucose_mmol", record.level.inMillimolesPerLiter)
+        }
+
+        val bpRecords = client.readRecords(ReadRecordsRequest(BloodPressureRecord::class, TimeRangeFilter.between(start, end))).records
+        for (record in bpRecords) {
+            val dayKey = record.time.atZone(zone).toLocalDate().toString()
+            attachValue(dayKey, "blood_pressure_systolic", record.systolic.inMillimetersOfMercury)
+            attachValue(dayKey, "blood_pressure_diastolic", record.diastolic.inMillimetersOfMercury)
+        }
+
+        val oxygenRecords = client.readRecords(ReadRecordsRequest(OxygenSaturationRecord::class, TimeRangeFilter.between(start, end))).records
+        for (record in oxygenRecords) {
+            val dayKey = record.time.atZone(zone).toLocalDate().toString()
+            attachValue(dayKey, "oxygen_saturation_percent", record.percentage.inPercent)
+        }
+
+        val hydrationRecords = client.readRecords(ReadRecordsRequest(HydrationRecord::class, TimeRangeFilter.between(start, end))).records
+        for (record in hydrationRecords) {
+            val dayKey = record.time.atZone(zone).toLocalDate().toString()
+            attachValue(dayKey, "hydration_liters", record.volume.inLiters)
+        }
+
+        val restingHeartRateRecords = client.readRecords(ReadRecordsRequest(RestingHeartRateRecord::class, TimeRangeFilter.between(start, end))).records
+        for (record in restingHeartRateRecords) {
+            val dayKey = record.time.atZone(zone).toLocalDate().toString()
+            attachValue(dayKey, "resting_heart_rate", record.bpm)
+        }
+
+        val hrvRecords = client.readRecords(ReadRecordsRequest(HeartRateVariabilityRmssdRecord::class, TimeRangeFilter.between(start, end))).records
+        for (record in hrvRecords) {
+            val dayKey = record.time.atZone(zone).toLocalDate().toString()
+            attachValue(dayKey, "hrv_rmssd_ms", record.heartRateVariabilityMillis)
+        }
+
+        val respiratoryRecords = client.readRecords(ReadRecordsRequest(RespiratoryRateRecord::class, TimeRangeFilter.between(start, end))).records
+        for (record in respiratoryRecords) {
+            val dayKey = record.time.atZone(zone).toLocalDate().toString()
+            attachValue(dayKey, "respiratory_rate", record.rate)
+        }
+
+        val vo2MaxRecords = client.readRecords(ReadRecordsRequest(Vo2MaxRecord::class, TimeRangeFilter.between(start, end))).records
+        for (record in vo2MaxRecords) {
+            val dayKey = record.time.atZone(zone).toLocalDate().toString()
+            attachValue(dayKey, "vo2_max", record.vo2MillilitersPerMinutePerKilogram)
+        }
+
+        val floorsRecords = client.readRecords(ReadRecordsRequest(FloorsClimbedRecord::class, TimeRangeFilter.between(start, end))).records
+        for (record in floorsRecords) {
+            val dayKey = record.time.atZone(zone).toLocalDate().toString()
+            attachValue(dayKey, "floors_climbed", record.floors)
+        }
+
+        val temperatureRecords = client.readRecords(ReadRecordsRequest(BodyTemperatureRecord::class, TimeRangeFilter.between(start, end))).records
+        for (record in temperatureRecords) {
+            val dayKey = record.time.atZone(zone).toLocalDate().toString()
+            attachValue(dayKey, "body_temperature_celsius", record.temperature.inCelsius)
+        }
     }
 
     private suspend fun readSleep(start: Instant, end: Instant): JSONArray {

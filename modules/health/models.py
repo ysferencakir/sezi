@@ -46,6 +46,13 @@ class HealthDay(Base):
     blood_glucose_mmol: Mapped[float | None] = mapped_column(Float, default=None)
     oxygen_saturation_percent: Mapped[float | None] = mapped_column(Float, default=None)
     hydration_liters: Mapped[float | None] = mapped_column(Float, default=None)
+    # Health Connect köprüsüyle gelen ek metrikler (2026-07-19)
+    resting_heart_rate: Mapped[float | None] = mapped_column(Float, default=None)
+    hrv_rmssd_ms: Mapped[float | None] = mapped_column(Float, default=None)
+    respiratory_rate: Mapped[float | None] = mapped_column(Float, default=None)
+    vo2_max: Mapped[float | None] = mapped_column(Float, default=None)
+    floors_climbed: Mapped[int | None] = mapped_column(Integer, default=None)
+    body_temperature_celsius: Mapped[float | None] = mapped_column(Float, default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

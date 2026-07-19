@@ -19,11 +19,23 @@ class DayPayload(BaseModel):
     active_minutes: int | None = None
     distance_meters: float | None = None
     weight_kg: float | None = None
+    height_cm: float | None = None
     body_fat_percent: float | None = None
+    nutrition_calories: float | None = None
+    nutrition_protein_g: float | None = None
+    nutrition_fat_g: float | None = None
+    nutrition_carbs_g: float | None = None
     blood_pressure_systolic: float | None = None
     blood_pressure_diastolic: float | None = None
+    blood_glucose_mmol: float | None = None
     oxygen_saturation_percent: float | None = None
     hydration_liters: float | None = None
+    resting_heart_rate: float | None = None
+    hrv_rmssd_ms: float | None = None
+    respiratory_rate: float | None = None
+    vo2_max: float | None = None
+    floors_climbed: int | None = None
+    body_temperature_celsius: float | None = None
 
 
 class SleepPayload(BaseModel):
