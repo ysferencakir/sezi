@@ -325,9 +325,9 @@ Sezi has built-in guardrails:
 - [x] Web dashboard (PWA served from `static/`, installable on Android)
 - [ ] Bank/finance module — postponed (data access is hard; Nordigen evaluated)
 - [ ] Investment module — not started
-- [ ] Query/filter endpoints — not started
+- [x] Health record query/filter endpoint (`GET /api/health/records`)
 - [ ] Email digest — not started
-- [ ] Samsung Health / Health Connect integration (replace Google Fit) — not started
+- [x] Samsung Health / Health Connect bridge (all stable readable record types)
 
 ### Phase 3 (later)
 - [ ] Correlation detection

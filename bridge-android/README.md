@@ -1,7 +1,8 @@
 # Sezi Bridge (Android)
 
 Samsung Health → Health Connect → Sezi köprüsü. Telefondaki Health Connect deposundan
-adım/mesafe/kalori/egzersiz süresi, uyku evreleri ve nabız verisini okur; 6 saatte bir
+kararlı 1.1.0 istemcisinin desteklediği tüm aktivite, vücut ölçümü, beslenme, uyku,
+yaşamsal bulgu ve döngü takibi kayıtlarını okur; 6 saatte bir
 `POST /api/health/ingest`'e gönderir. Google Fit REST API'nin 2026 sonunda kapanmasına
 karşı geçiş yolu (bkz. kök dizindeki `HANDOFF.md` → Gelecek Planı).
 
@@ -45,8 +46,10 @@ günceline yükselt (`app/build.gradle.kts`).
 ## Mimari notlar
 
 - `HealthReader` — Health Connect aggregate API'siyle gün bazlı özet + uyku evreleri
-  (`awake/light/deep/rem`, backend'in beklediği adlarla) + nabız örnekleri (~300'e seyreltilmiş).
+  (`awake/light/deep/rem`, backend'in beklediği adlarla) + nabız örnekleri (~300'e
+  seyreltilmiş) ve desteklenen tüm kayıt türlerinin kayıpsız JSON alanları.
 - `SyncWorker` — WorkManager periyodik iş (6 saat, yalnız ağ varken; hata → otomatik retry).
 - `ApiClient` — OkHttp, `X-Ingest-Token` başlığıyla POST.
-- Backend upsert + dedupe yaptığı için aynı verinin tekrar gönderilmesi zararsızdır;
+- Backend günlük özetleri ve ham kayıtları upsert, uyku/nabız verisini dedupe ettiği
+  için aynı verinin tekrar gönderilmesi zararsızdır;
   Google Fit senkronuyla paralel çalışabilir (bkz. `api/routers/ingest.py`).

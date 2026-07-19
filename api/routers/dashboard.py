@@ -1,18 +1,50 @@
 from datetime import date, timedelta
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from sqlalchemy import func, select
 
 from core.database import AsyncSessionFactory
 from modules.calendar.models import CalendarDay, CalendarEvent
 from modules.context.models import WeeklyContext
 from modules.currency.models import CurrencyDay
-from modules.health.models import HealthDay, SleepSession
+from modules.health.models import HealthDay, HealthRecord, SleepSession
 from modules.smoking.models import SmokingDay
 from modules.spotify.models import PlayedTrack
 from modules.weather.models import WeatherDay
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
+
+HEALTH_DAY_FIELDS = (
+    "steps",
+    "calories",
+    "active_minutes",
+    "distance_meters",
+    "weight_kg",
+    "height_cm",
+    "body_fat_percent",
+    "nutrition_calories",
+    "nutrition_protein_g",
+    "nutrition_fat_g",
+    "nutrition_carbs_g",
+    "blood_pressure_systolic",
+    "blood_pressure_diastolic",
+    "blood_glucose_mmol",
+    "oxygen_saturation_percent",
+    "hydration_liters",
+    "resting_heart_rate",
+    "hrv_rmssd_ms",
+    "respiratory_rate",
+    "vo2_max",
+    "floors_climbed",
+    "body_temperature_celsius",
+)
+
+
+def _health_day_dict(row: HealthDay) -> dict:
+    return {
+        "day": row.day.isoformat(),
+        **{field: getattr(row, field) for field in HEALTH_DAY_FIELDS},
+    }
 
 
 @router.get("/summary")
@@ -41,13 +73,7 @@ async def get_summary():
         ).scalar_one_or_none()
 
     return {
-        "health": None if health is None else {
-            "day": health.day.isoformat(),
-            "steps": health.steps,
-            "calories": health.calories,
-            "active_minutes": health.active_minutes,
-            "distance_meters": health.distance_meters,
-        },
+        "health": None if health is None else _health_day_dict(health),
         "calendar": None if calendar is None else {
             "day": calendar.day.isoformat(),
             "meeting_count": calendar.meeting_count,
@@ -156,12 +182,7 @@ async def get_history(days: int = 30):
     return {
         "since": since.isoformat(),
         "health": [
-            {
-                "day": row.day.isoformat(),
-                "steps": row.steps,
-                "calories": row.calories,
-                "active_minutes": row.active_minutes,
-            }
+            _health_day_dict(row)
             for row in health_rows
         ],
         "sleep": [{"day": iso(day), "minutes": int(minutes)} for day, minutes in sleep_rows],
@@ -189,6 +210,53 @@ async def get_history(days: int = 30):
             for row in currency_rows
         ],
         "spotify": [{"day": iso(day), "plays": plays} for day, plays in spotify_rows],
+    }
+
+
+@router.get("/health/records")
+async def get_health_records(
+    days: int = Query(default=30, ge=1, le=365),
+    limit: int = Query(default=500, ge=1, le=2000),
+    category: str | None = None,
+    record_type: str | None = None,
+):
+    """Health Connect'ten gelen tüm kayıt türlerini filtrelenebilir şekilde döndürür."""
+    since = date.today() - timedelta(days=days)
+    query = select(HealthRecord).where(func.date(HealthRecord.start_time) >= since)
+    if category:
+        query = query.where(HealthRecord.category == category)
+    if record_type:
+        query = query.where(HealthRecord.record_type == record_type)
+    query = query.order_by(HealthRecord.start_time.desc(), HealthRecord.id.desc()).limit(limit)
+
+    async with AsyncSessionFactory() as session:
+        rows = (await session.execute(query)).scalars().all()
+
+    categories: dict[str, int] = {}
+    record_types: dict[str, int] = {}
+    for row in rows:
+        categories[row.category] = categories.get(row.category, 0) + 1
+        record_types[row.record_type] = record_types.get(row.record_type, 0) + 1
+
+    return {
+        "since": since.isoformat(),
+        "count": len(rows),
+        "categories": categories,
+        "record_types": record_types,
+        "records": [
+            {
+                "external_id": row.external_id,
+                "record_type": row.record_type,
+                "category": row.category,
+                "title": row.title,
+                "start_time": row.start_time.isoformat() if row.start_time else None,
+                "end_time": row.end_time.isoformat() if row.end_time else None,
+                "value": row.value,
+                "unit": row.unit,
+                "data": row.data or {},
+            }
+            for row in rows
+        ],
     }
 
 

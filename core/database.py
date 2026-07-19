@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, func
+from sqlalchemy import DateTime, String, func, inspect
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -38,3 +38,26 @@ async def get_session() -> AsyncSession:
 async def create_tables() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_add_missing_health_day_columns)
+
+
+def _add_missing_health_day_columns(connection) -> None:
+    """create_all mevcut tablolara sütun eklemez; nullable sağlık alanlarını tamamla.
+
+    Proje henüz tam Alembic migration zincirine sahip olmadığı için Health Connect
+    kapsamı genişlerken mevcut kurulumların veri kaybetmeden açılmasını sağlar.
+    """
+    from modules.health.models import HealthDay
+
+    inspector = inspect(connection)
+    if not inspector.has_table(HealthDay.__tablename__):
+        return
+    existing = {column["name"] for column in inspector.get_columns(HealthDay.__tablename__)}
+    for column in HealthDay.__table__.columns:
+        if column.name in existing or not column.nullable:
+            continue
+        type_sql = column.type.compile(dialect=connection.dialect)
+        connection.exec_driver_sql(
+            f'ALTER TABLE "{HealthDay.__tablename__}" '
+            f'ADD COLUMN "{column.name}" {type_sql}'
+        )

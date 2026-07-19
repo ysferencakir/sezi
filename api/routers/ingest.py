@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from core.config import settings
 from core.database import AsyncSessionFactory
-from modules.health.models import HealthDay, HeartRate, SleepSession
+from modules.health.models import HealthDay, HealthRecord, HeartRate, SleepSession
 
 router = APIRouter(prefix="/api/health", tags=["ingest"])
 
@@ -49,11 +49,24 @@ class HeartRatePayload(BaseModel):
     bpm: float
 
 
+class RawHealthRecordPayload(BaseModel):
+    external_id: str = Field(max_length=255)
+    record_type: str = Field(max_length=100)
+    category: str = Field(default="other", max_length=50)
+    title: str | None = Field(default=None, max_length=255)
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    value: float | None = None
+    unit: str | None = Field(default=None, max_length=50)
+    data: dict = Field(default_factory=dict)
+
+
 class IngestPayload(BaseModel):
     source: str = Field(default="health_connect", max_length=50)
-    days: list[DayPayload] = []
-    sleep_sessions: list[SleepPayload] = []
-    heart_rates: list[HeartRatePayload] = []
+    days: list[DayPayload] = Field(default_factory=list)
+    sleep_sessions: list[SleepPayload] = Field(default_factory=list)
+    heart_rates: list[HeartRatePayload] = Field(default_factory=list)
+    raw_records: list[RawHealthRecordPayload] = Field(default_factory=list)
 
 
 def _check_token(token: str | None) -> None:
@@ -77,6 +90,7 @@ async def ingest_health(payload: IngestPayload, x_ingest_token: str | None = Hea
     sleep_skipped = 0
     hr_added = 0
     hr_skipped = 0
+    records_upserted = 0
 
     async with AsyncSessionFactory() as session:
         for d in payload.days:
@@ -131,6 +145,20 @@ async def ingest_health(payload: IngestPayload, x_ingest_token: str | None = Hea
                 existing_hr.add(h.measured_at)
                 hr_added += 1
 
+        for record in payload.raw_records:
+            values = record.model_dump(exclude_none=True)
+            values["source"] = payload.source
+            stmt = insert(HealthRecord).values(**values).on_conflict_do_update(
+                index_elements=["source", "external_id"],
+                set_={
+                    key: value
+                    for key, value in values.items()
+                    if key not in {"source", "external_id"}
+                },
+            )
+            await session.execute(stmt)
+            records_upserted += 1
+
         await session.commit()
 
     return {
@@ -141,4 +169,5 @@ async def ingest_health(payload: IngestPayload, x_ingest_token: str | None = Hea
         "sleep_skipped": sleep_skipped,
         "heart_rates_added": hr_added,
         "heart_rates_skipped": hr_skipped,
+        "records_upserted": records_upserted,
     }
