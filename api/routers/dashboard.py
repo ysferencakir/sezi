@@ -72,13 +72,11 @@ async def get_summary():
             await session.execute(select(CurrencyDay).order_by(CurrencyDay.day.desc()).limit(1))
         ).scalar_one_or_none()
 
-        # Metrik başına son bilinen değer: son 90 günün satırlarını tarayıp
+        # Metrik başına son bilinen değer: tüm geçmişi yeniden eskiye tarayıp
         # her alan için en yeni non-null değeri (ve gününü) çıkar.
         recent_rows = (
             await session.execute(
-                select(HealthDay)
-                .where(HealthDay.day >= date.today() - timedelta(days=90))
-                .order_by(HealthDay.day.desc())
+                select(HealthDay).order_by(HealthDay.day.desc())
             )
         ).scalars().all()
         health_latest: dict[str, dict] = {}
@@ -165,7 +163,7 @@ async def get_summary():
 @router.get("/history")
 async def get_history(days: int = 30):
     """Son N günün gün bazlı serileri — dashboard trend grafiklerini besler."""
-    days = max(1, min(days, 365))
+    days = max(1, min(days, 3650))  # 3650 = "Tümü" (pratikte verinin başladığı güne kadar)
     since = date.today() - timedelta(days=days)
 
     async with AsyncSessionFactory() as session:
@@ -311,7 +309,7 @@ async def get_heart_rate(hours: int = Query(default=48, ge=1, le=720)):
 
 @router.get("/health/records")
 async def get_health_records(
-    days: int = Query(default=30, ge=1, le=365),
+    days: int = Query(default=30, ge=1, le=3650),
     limit: int = Query(default=500, ge=1, le=2000),
     offset: int = Query(default=0, ge=0),
     category: str | None = None,
