@@ -32,9 +32,13 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
-      - name: Generate Gradle wrapper
+      - name: Generate Gradle wrapper if missing
         working-directory: bridge-android
-        run: gradle wrapper --gradle-version 8.11.1
+        run: |
+          if [ ! -f ./gradlew ]; then
+            gradle wrapper --gradle-version 8.11.1
+          fi
+          chmod +x ./gradlew
 
       - name: Build debug APK
         working-directory: bridge-android
