@@ -6,14 +6,58 @@ yaşamsal bulgu ve döngü takibi kayıtlarını okur; 6 saatte bir
 `POST /api/health/ingest`'e gönderir. Google Fit REST API'nin 2026 sonunda kapanmasına
 karşı geçiş yolu (bkz. kök dizindeki `HANDOFF.md` → Gelecek Planı).
 
-## Derleme — Yol 1: GitHub Actions (önerilen, lokal kurulum gerekmez)
+## Dağıtım — imzalı GitHub Release (önerilen)
 
-`bridge-android/` altında bir değişiklik push'landığında (veya Actions sekmesinden
-**Build Bridge APK → Run workflow** ile elle) APK bulutta derlenir:
+Kalıcı imza Secrets kurulumu bir kez tamamlandıktan sonra `main` dalındaki her Android
+kod değişikliği:
 
-1. GitHub → repo → **Actions** → "Build Bridge APK" çalışmasının sayfası
-2. Sayfanın altındaki **Artifacts** bölümünden `sezi-bridge-apk` dosyasını indir
-   (telefonun tarayıcısından da indirilebilir — GitHub'a giriş gerekir; zip içinden `app-debug.apk` çıkar)
+1. Aynı release anahtarıyla imzalanmış yeni bir APK üretir.
+2. Sürüm kodunu otomatik artırır.
+3. APK ve SHA-256 dosyasını yeni bir
+   [GitHub Release](https://github.com/ysferencakir/sezi/releases) olarak yayınlar.
+4. Obtainium'un telefonda yeni sürümü bulmasını sağlar.
+
+### Tek seferlik imza kurulumu
+
+JDK 17 kurulu bir Windows bilgisayarda repo kökünden:
+
+```powershell
+.\bridge-android\scripts\prepare-signing-key.ps1
+```
+
+Komut kalıcı `sezi-release.jks` dosyasını kullanıcı dizininin altındaki
+`sezi-signing` klasöründe oluşturur ve base64 değerini panoya kopyalar. GitHub
+**Settings → Secrets and variables → Actions** bölümüne şu repository secret'ları ekle:
+
+- `ANDROID_KEYSTORE_BASE64`
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
+
+JKS dosyasını ve parolaları güvenli, çevrimdışı ikinci bir yerde yedekle. Bu anahtar
+kaybolursa mevcut kurulumların üzerine imzalı güncelleme yayınlanamaz.
+
+İlk kalıcı imzalı release APK'sına geçerken eski debug APK son kez kaldırılmalıdır.
+Bu ilk geçişten sonra URL, token ve izinler sonraki güncellemelerde korunur.
+
+### Obtainium
+
+Obtainium'da **Add App** seçeneğine şu adresi ver:
+
+`https://github.com/ysferencakir/sezi`
+
+Kaynak olarak GitHub Releases'ı ve APK filtresi olarak `sezi-bridge-*.apk` desenini
+seç. Bundan sonraki sürümler uygulamayı kaldırmadan mevcut kurulumun üzerine yüklenir;
+Android yalnız güncelleme kurulumu için onay isteyebilir.
+
+## CI doğrulaması — debug artifact
+
+`bridge-android/` altında bir değişiklik push'landığında **Build Bridge APK** akışı
+ayrıca kodun derlendiğini doğrular. Buradaki `sezi-bridge-debug-ci-only` artifact'i
+geçici debug anahtarı taşır ve telefona kalıcı kurulum için kullanılmamalıdır.
+
+Telefona kurulacak dosya her zaman GitHub **Releases** sayfasındaki
+`sezi-bridge-v*.apk` dosyasıdır.
 
 ## Derleme — Yol 2: Android Studio (lokal)
 
@@ -53,3 +97,10 @@ günceline yükselt (`app/build.gradle.kts`).
 - Backend günlük özetleri ve ham kayıtları upsert, uyku/nabız verisini dedupe ettiği
   için aynı verinin tekrar gönderilmesi zararsızdır;
   Google Fit senkronuyla paralel çalışabilir (bkz. `api/routers/ingest.py`).
+
+## Güncelleme dağıtımı
+
+- Release keystore yalnız GitHub Secrets ve kullanıcının güvenli yedeğinde tutulur.
+- `Publish Bridge APK` aynı imzayla release APK üretip GitHub Releases'a yükler.
+- Obtainium yeni sürümleri takip eder; ilk imza geçişinden sonra APK kaldırılmadan
+  güncellenir ve uygulama ayarları korunur.

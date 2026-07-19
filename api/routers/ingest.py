@@ -145,19 +145,34 @@ async def ingest_health(payload: IngestPayload, x_ingest_token: str | None = Hea
                 existing_hr.add(h.measured_at)
                 hr_added += 1
 
-        for record in payload.raw_records:
-            values = record.model_dump(exclude_none=True)
-            values["source"] = payload.source
-            stmt = insert(HealthRecord).values(**values).on_conflict_do_update(
+        # Ham Health Connect kayıtlarını tek tek Neon'a göndermek büyük
+        # senkronlarda yüzlerce ağ turu ve mobil istemcide timeout üretiyordu.
+        # Sabit boyutlu toplu upsert ile aynı işi birkaç sorguda tamamla.
+        raw_values = [
+            {**record.model_dump(), "source": payload.source}
+            for record in payload.raw_records
+        ]
+        for offset in range(0, len(raw_values), 500):
+            batch = raw_values[offset : offset + 500]
+            insert_stmt = insert(HealthRecord).values(batch)
+            stmt = insert_stmt.on_conflict_do_update(
                 index_elements=["source", "external_id"],
                 set_={
-                    key: value
-                    for key, value in values.items()
-                    if key not in {"source", "external_id"}
+                    key: getattr(insert_stmt.excluded, key)
+                    for key in (
+                        "record_type",
+                        "category",
+                        "title",
+                        "start_time",
+                        "end_time",
+                        "value",
+                        "unit",
+                        "data",
+                    )
                 },
             )
             await session.execute(stmt)
-            records_upserted += 1
+            records_upserted += len(batch)
 
         await session.commit()
 

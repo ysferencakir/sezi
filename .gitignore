@@ -13,3 +13,8 @@ bridge-android/.gradle/
 bridge-android/.idea/
 bridge-android/local.properties
 bridge-android/**/build/
+# Android release imza anahtarları kesinlikle repoya girmez
+*.jks
+*.keystore
+keystore.properties
+bridge-android/signing/

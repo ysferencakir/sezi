@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity() {
             textSize = 24f
         })
         root.addView(TextView(this).apply {
-            text = "Samsung Health → Health Connect → Sezi"
+            text = "Samsung Health → Health Connect → Sezi · v${BuildConfig.VERSION_NAME}"
             textSize = 14f
         })
 

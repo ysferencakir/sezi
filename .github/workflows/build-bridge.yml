@@ -52,6 +52,6 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sezi-bridge-apk
+          name: sezi-bridge-debug-ci-only
           path: bridge-android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 30
+          retention-days: 7

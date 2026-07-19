@@ -102,7 +102,26 @@ Health modülü Google Fit REST API kullanıyor; Google bu API'yi **2026 sonuna 
 
 **Önerilen zamanlama:** Eylül-Ekim 2026'da geçişe başla (yıl sonu son tarihinden önce 2-3 ay tampon); o zamana kadar çeyrekte bir yukarıdaki Fit sayfasından tarih değişikliği kontrol et.
 
-### 2. Diğer sıradaki işler (öncelik sırasıyla)
+### 2. Android köprüsü için kalıcı imza ve kolay güncelleme
+
+**Hedef:** Her yeni APK'da uygulamayı kaldırıp URL/token ve Health Connect izinlerini
+yeniden kurma zorunluluğunu kaldırmak.
+
+- [x] Gradle'ı yalnız ortam değişkenleriyle sağlanan kalıcı release anahtarını kullanacak şekilde hazırla.
+- [x] `Publish Bridge APK` akışıyla sürüm kodunu otomatik artır, imzayı doğrula ve
+  APK/SHA-256 dosyalarını GitHub Releases'a ekle.
+- [x] Debug artifact'i `ci-only` olarak ayır; telefon dağıtımında kullanılmamasını belgele.
+- [x] Keystore üretimi ve base64 hazırlığı için `prepare-signing-key.ps1` ekle.
+- [ ] Kalıcı release keystore'u bir kez oluştur; özel anahtarı repoya ekleme.
+- [ ] Keystore, alias ve parolaları GitHub Actions Secrets içinde sakla.
+- [ ] Telefonda Obtainium ile GitHub Releases kaynağını takip et; yeni sürüm bildirimini
+  ve mevcut uygulamanın üzerine kurulabilen güncellemeleri etkinleştir.
+- [ ] İlk kalıcı imzalı sürüme geçerken eski debug APK'yı son kez kaldırıp yeniden kur.
+  Bu geçişten sonraki güncellemelerde uygulama verileri ve izinler korunmalı.
+- [ ] İleride tam otomatik güncelleme istenirse Play Store kapalı test kanalını ve
+  Health Connect veri erişimi beyanlarını ayrıca değerlendir.
+
+### 3. Diğer sıradaki işler (öncelik sırasıyla)
 
 1. **Query/filter endpoint'leri** — "10+ toplantılı haftaları göster" tipi sorgular; PWA'ya arama sekmesi olarak eklenebilir.
 2. **Yatırım modülü** — rapora göre: altın için goldprice.dev (spot çekirdek) + ayrı prim katmanı; TEFAS için tefas-crawler + cache; BIST için Yapı Kredi API Portal.

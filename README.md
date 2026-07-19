@@ -328,6 +328,7 @@ Sezi has built-in guardrails:
 - [x] Health record query/filter endpoint (`GET /api/health/records`)
 - [ ] Email digest — not started
 - [x] Samsung Health / Health Connect bridge (all stable readable record types)
+- [ ] Stable APK signing + GitHub Releases + Obtainium update flow
 
 ### Phase 3 (later)
 - [ ] Correlation detection
