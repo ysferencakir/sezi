@@ -8,3 +8,8 @@ dist/
 build/
 .pytest_cache/
 graphify-out/
+# Android (bridge-android) derleme çıktıları
+bridge-android/.gradle/
+bridge-android/.idea/
+bridge-android/local.properties
+bridge-android/**/build/
