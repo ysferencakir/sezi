@@ -19,6 +19,7 @@ from modules.context import service
 from modules.smoking import service as smoking_service
 from modules.transit import eshot_scraper, izmir_transit
 from modules.transit.routes import ROUTES
+from modules.watchlog import service as watchlog_service
 from modules.weather import location_service
 
 FEELING, NOTES, EVENTS = range(3)
@@ -118,6 +119,25 @@ async def _smoke_chosen(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     count = int(query.data.split(":")[1])
     await smoking_service.submit_count(day=date.today(), count=count)
     await query.edit_message_text(f"Kaydedildi ✅ — bugün: {count}")
+
+
+async def _watch_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    text = " ".join(ctx.args) if ctx.args else ""
+    if not text:
+        await update.message.reply_text("Ne izledin? Örnek: /izledim The Mentalist 5. bölüm")
+        return
+
+    await ctx.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+    row = await watchlog_service.log_watch(text)
+
+    if row.matched:
+        ep = f" · S{row.season}E{row.episode}" if row.episode else ""
+        summary = f"{row.overview[:200]}…" if row.overview and len(row.overview) > 200 else (row.overview or "")
+        await update.message.reply_text(f"Kaydedildi ✅ — {row.title}{ep}\n{summary}".strip())
+    else:
+        await update.message.reply_text(
+            f'Kaydedildi ✅ — "{row.raw_text}" (TMDB\'de eşleşme bulunamadı, ham metin olarak kaydedildi)'
+        )
 
 
 async def _fetch_route_arrivals(route: dict) -> list[dict] | None:
@@ -339,6 +359,7 @@ def _build_application() -> Application:
     )
     app.add_handler(conv)
     app.add_handler(CommandHandler("sigara", _smoke_start))
+    app.add_handler(CommandHandler("izledim", _watch_log))
     app.add_handler(CallbackQueryHandler(_smoke_chosen, pattern=r"^smoke:"))
     app.add_handler(MessageHandler(filters.LOCATION, _location_received))
     app.add_handler(CommandHandler("otobus", _bus_status))

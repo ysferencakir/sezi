@@ -68,10 +68,16 @@ Sezi collects data from multiple sources and stores it in a personal database, e
    # Edit .env with your credentials
    ```
 
-5. **Run migrations (if needed):**
+5. **Run migrations:**
+
    ```bash
-   # SQLAlchemy will auto-create tables on first run
+   alembic upgrade head
    ```
+
+   Boş bir veritabanında `python main.py` de tabloları otomatik oluşturur (`create_tables()`),
+   ama şema değişiklikleri (yeni sütun/tablo) artık Alembic migration'ları ile takip ediliyor —
+   yeni bir modül/alan eklerken `alembic revision --autogenerate -m "..."` çalıştırıp
+   `alembic/versions/`'daki dosyayı gözden geçirmeden commit'leme.
 
 6. **Start development server:**
    ```bash

@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from pydantic import BaseModel
@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from api.routers import auth, barcode, context, dashboard, ingest
 from core import module_loader, scheduler, telegram_bot
 from core.database import create_tables
+from core.security import require_admin_token
 
 
 @asynccontextmanager
@@ -51,7 +52,7 @@ async def list_modules():
     ]
 
 
-@app.post("/modules/{name}/run")
+@app.post("/modules/{name}/run", dependencies=[Depends(require_admin_token)])
 async def run_module(name: str):
     module = module_loader.get(name)
     if module is None:
@@ -64,7 +65,7 @@ async def run_module(name: str):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-@app.post("/modules/{name}/trigger/{job_id}")
+@app.post("/modules/{name}/trigger/{job_id}", dependencies=[Depends(require_admin_token)])
 async def trigger_module_job(name: str, job_id: str):
     """Zamanlanmış bir job'ı (ör. digest.morning_digest) manuel tetikler —
     aynı handler çağrıldığı için sonuç, mevcut veriyle her seferinde tutarlıdır."""

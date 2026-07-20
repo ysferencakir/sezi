@@ -5,6 +5,7 @@ from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
 
 from core.base_module import BaseModule, Schedule
+from core.notifier import notifier
 
 # Sunucunun sistem saat dilimi barındırma ortamına göre değişebilir (örn. Render.com UTC kullanır);
 # tüm modüllerin cron ifadeleri Türkiye saatine göre yazıldığı için burada açıkça sabitliyoruz.
@@ -21,6 +22,10 @@ def _make_job(module: BaseModule, schedule: Schedule):
             await handler()
         except Exception as exc:
             logger.exception(f"[{module.name}] job '{schedule.job_id}' failed: {exc}")
+            await notifier.send(
+                f"[{module.name}] '{schedule.job_id}' başarısız: {type(exc).__name__}: {exc}",
+                title="Sezi · Job hatası",
+            )
 
     return job
 

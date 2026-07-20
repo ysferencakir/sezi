@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # Health Connect köprü uygulamasının POST /api/health/ingest için kullandığı
     # paylaşımlı sır. Boş bırakılırsa ingest endpoint'i kapalıdır (503 döner).
     health_ingest_token: str = ""
+    # Modül tetikleme (/modules/{name}/run, /trigger) ve context yazma (POST /api/context)
+    # uçları için paylaşımlı sır. Boş bırakılırsa bu uçlar kapalıdır (503 döner).
+    admin_token: str = ""
 
     # altinapi.com (Harem Altın verisi) — gram + sarrafiye (çeyrek/yarım/tam/ata) fiyatları
     altinapi_key: str = ""
@@ -51,6 +54,10 @@ class Settings(BaseSettings):
     strava_client_id: str = ""
     strava_client_secret: str = ""
     strava_redirect_uri: str = "http://localhost:8000/auth/strava/callback"
+
+    # TMDB (themoviedb.org → hesap ayarlarından ücretsiz API key al) — Telegram'a
+    # yazılan dizi/film adlarını zenginleştirmek (poster, özet, çıkış tarihi) için.
+    tmdb_api_key: str = ""
 
     # TCMB EVDS (evds2.tcmb.gov.tr) — ücretsiz self-serve kayıt, API key header'da.
     evds_api_key: str = ""

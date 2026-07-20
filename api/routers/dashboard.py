@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Query
+from loguru import logger
 from sqlalchemy import func, select
 
 from core.database import AsyncSessionFactory, ModuleRecord
@@ -19,6 +20,7 @@ from modules.spotify.models import PlayedTrack
 from modules.stocks.models import StockDay
 from modules.strava.models import StravaActivity
 from modules.tefas.models import FundDay
+from modules.watchlog.models import WatchLog
 from modules.weather.models import WeatherDay
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
@@ -80,55 +82,75 @@ async def get_summary():
         currency = (
             await session.execute(select(CurrencyDay).order_by(CurrencyDay.day.desc()).limit(1))
         ).scalar_one_or_none()
-        gold = (
-            await session.execute(select(GoldDay).order_by(GoldDay.day.desc()).limit(1))
-        ).scalar_one_or_none()
-        evds = (
-            await session.execute(select(EvdsDay).order_by(EvdsDay.day.desc()).limit(1))
-        ).scalar_one_or_none()
-        # Her sembol/fon için en güncel kaydı almak üzere son N günü çekip
-        # Python tarafında sembol/fon başına ilk (en yeni) satırı tutuyoruz —
-        # izleme listesi küçük olduğu için bu, ayrı bir GROUP BY sorgusundan basit.
-        stock_rows = (
-            await session.execute(select(StockDay).order_by(StockDay.day.desc()).limit(50))
-        ).scalars().all()
-        stocks_latest: dict[str, StockDay] = {}
-        for row in stock_rows:
-            stocks_latest.setdefault(row.symbol, row)
-        fund_rows = (
-            await session.execute(select(FundDay).order_by(FundDay.day.desc()).limit(100))
-        ).scalars().all()
-        funds_latest: dict[str, FundDay] = {}
-        for row in fund_rows:
-            funds_latest.setdefault(row.fund_code, row)
-        strava_rows = (
-            await session.execute(
-                select(StravaActivity).order_by(StravaActivity.start_date.desc()).limit(3)
-            )
-        ).scalars().all()
-        upcoming_events = (
-            await session.execute(
-                select(EventItem).order_by(EventItem.published_at.desc()).limit(5)
-            )
-        ).scalars().all()
-        outages_today = (
-            await session.execute(select(PowerOutage).where(PowerOutage.day == date.today()))
-        ).scalars().all()
 
-        # Metrik başına son bilinen değer: tüm geçmişi yeniden eskiye tarayıp
-        # her alan için en yeni non-null değeri (ve gününü) çıkar.
-        recent_rows = (
-            await session.execute(
-                select(HealthDay).order_by(HealthDay.day.desc())
-            )
-        ).scalars().all()
+        # Daha yeni/az test edilmiş modüllerin (gold/evds/stocks/tefas/strava/events/energy)
+        # sorguları tek bir bloka alınmıştır — biri beklenmedik şekilde patlarsa (ör. şema
+        # değişikliği, undocumented kaynak formatı bozulması) yukarıdaki temel kartlar
+        # (health/calendar/weather/smoking/currency) yine de dönmeye devam eder.
+        gold = evds = None
+        stocks_latest: dict[str, StockDay] = {}
+        funds_latest: dict[str, FundDay] = {}
+        strava_rows: list = []
+        upcoming_events: list = []
+        outages_today: list = []
+        watch_rows: list = []
+        try:
+            gold = (
+                await session.execute(select(GoldDay).order_by(GoldDay.day.desc()).limit(1))
+            ).scalar_one_or_none()
+            evds = (
+                await session.execute(select(EvdsDay).order_by(EvdsDay.day.desc()).limit(1))
+            ).scalar_one_or_none()
+            # Her sembol/fon için en güncel kaydı almak üzere son N günü çekip
+            # Python tarafında sembol/fon başına ilk (en yeni) satırı tutuyoruz —
+            # izleme listesi küçük olduğu için bu, ayrı bir GROUP BY sorgusundan basit.
+            stock_rows = (
+                await session.execute(select(StockDay).order_by(StockDay.day.desc()).limit(50))
+            ).scalars().all()
+            for row in stock_rows:
+                stocks_latest.setdefault(row.symbol, row)
+            fund_rows = (
+                await session.execute(select(FundDay).order_by(FundDay.day.desc()).limit(100))
+            ).scalars().all()
+            for row in fund_rows:
+                funds_latest.setdefault(row.fund_code, row)
+            strava_rows = (
+                await session.execute(
+                    select(StravaActivity).order_by(StravaActivity.start_date.desc()).limit(3)
+                )
+            ).scalars().all()
+            upcoming_events = (
+                await session.execute(
+                    select(EventItem).order_by(EventItem.published_at.desc()).limit(5)
+                )
+            ).scalars().all()
+            outages_today = (
+                await session.execute(select(PowerOutage).where(PowerOutage.day == date.today()))
+            ).scalars().all()
+            watch_rows = (
+                await session.execute(select(WatchLog).order_by(WatchLog.created_at.desc()).limit(5))
+            ).scalars().all()
+        except Exception:
+            logger.exception("[/api/summary] yeni modül kartları yüklenemedi — temel kartlar etkilenmeden devam ediyor")
+            await session.rollback()
+
+        # Metrik başına son bilinen değer: her alan için ayrı, indeksli bir
+        # "en yeni non-null" sorgusu — geçmiş 10 yıla çıktığı için (bkz. HealthDay)
+        # tüm tabloyu Python'a çekip taramak yerine (eskiden böyleydi) her alanda
+        # LIMIT 1 ile veritabanına bırakılıyor.
         health_latest: dict[str, dict] = {}
-        for row in recent_rows:
-            for field in HEALTH_DAY_FIELDS:
-                if field not in health_latest:
-                    value = getattr(row, field)
-                    if value is not None:
-                        health_latest[field] = {"value": value, "day": row.day.isoformat()}
+        for field in HEALTH_DAY_FIELDS:
+            column = getattr(HealthDay, field)
+            row = (
+                await session.execute(
+                    select(HealthDay.day, column)
+                    .where(column.isnot(None))
+                    .order_by(HealthDay.day.desc())
+                    .limit(1)
+                )
+            ).first()
+            if row is not None:
+                health_latest[field] = {"value": row[1], "day": row[0].isoformat()}
 
         # Son uyku gecesi (awake evreleri hariç toplam dakika)
         sleep_last_row = (
@@ -243,6 +265,18 @@ async def get_summary():
             for row in upcoming_events
         ],
         "outages_today": len(outages_today),
+        "watch_recent": [
+            {
+                "title": row.title,
+                "season": row.season,
+                "episode": row.episode,
+                "media_type": row.media_type,
+                "poster_path": row.poster_path,
+                "matched": row.matched,
+                "day": row.day.isoformat(),
+            }
+            for row in watch_rows
+        ],
     }
 
 
