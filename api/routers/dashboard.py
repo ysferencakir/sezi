@@ -7,9 +7,18 @@ from core.database import AsyncSessionFactory, ModuleRecord
 from modules.calendar.models import CalendarDay, CalendarEvent
 from modules.context.models import WeeklyContext
 from modules.currency.models import CurrencyDay
+
+
+from modules.energy.models import PowerOutage
+from modules.evds.models import EvdsDay
+from modules.events.models import EventItem
+from modules.gold.models import GoldDay
 from modules.health.models import HealthDay, HealthRecord, HeartRate, SleepSession
 from modules.smoking.models import SmokingDay
 from modules.spotify.models import PlayedTrack
+from modules.stocks.models import StockDay
+from modules.strava.models import StravaActivity
+from modules.tefas.models import FundDay
 from modules.weather.models import WeatherDay
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
@@ -71,6 +80,40 @@ async def get_summary():
         currency = (
             await session.execute(select(CurrencyDay).order_by(CurrencyDay.day.desc()).limit(1))
         ).scalar_one_or_none()
+        gold = (
+            await session.execute(select(GoldDay).order_by(GoldDay.day.desc()).limit(1))
+        ).scalar_one_or_none()
+        evds = (
+            await session.execute(select(EvdsDay).order_by(EvdsDay.day.desc()).limit(1))
+        ).scalar_one_or_none()
+        # Her sembol/fon için en güncel kaydı almak üzere son N günü çekip
+        # Python tarafında sembol/fon başına ilk (en yeni) satırı tutuyoruz —
+        # izleme listesi küçük olduğu için bu, ayrı bir GROUP BY sorgusundan basit.
+        stock_rows = (
+            await session.execute(select(StockDay).order_by(StockDay.day.desc()).limit(50))
+        ).scalars().all()
+        stocks_latest: dict[str, StockDay] = {}
+        for row in stock_rows:
+            stocks_latest.setdefault(row.symbol, row)
+        fund_rows = (
+            await session.execute(select(FundDay).order_by(FundDay.day.desc()).limit(100))
+        ).scalars().all()
+        funds_latest: dict[str, FundDay] = {}
+        for row in fund_rows:
+            funds_latest.setdefault(row.fund_code, row)
+        strava_rows = (
+            await session.execute(
+                select(StravaActivity).order_by(StravaActivity.start_date.desc()).limit(3)
+            )
+        ).scalars().all()
+        upcoming_events = (
+            await session.execute(
+                select(EventItem).order_by(EventItem.published_at.desc()).limit(5)
+            )
+        ).scalars().all()
+        outages_today = (
+            await session.execute(select(PowerOutage).where(PowerOutage.day == date.today()))
+        ).scalars().all()
 
         # Metrik başına son bilinen değer: tüm geçmişi yeniden eskiye tarayıp
         # her alan için en yeni non-null değeri (ve gününü) çıkar.
@@ -157,6 +200,49 @@ async def get_summary():
             "usd_try": currency.usd_try,
             "eur_try": currency.eur_try,
         },
+        "gold": None if gold is None else {
+            "day": gold.day.isoformat(),
+            "gram_altin_satis": gold.gram_altin_satis,
+            "ceyrek_satis": gold.ceyrek_satis,
+            "yarim_satis": gold.yarim_satis,
+            "tam_satis": gold.tam_satis,
+            "ata_satis": gold.ata_satis,
+        },
+        "evds": None if evds is None else {
+            "day": evds.day.isoformat(),
+            "usd_alis": evds.usd_alis,
+            "usd_satis": evds.usd_satis,
+            "eur_alis": evds.eur_alis,
+            "eur_satis": evds.eur_satis,
+        },
+        "stocks": [
+            {"symbol": row.symbol, "day": row.day.isoformat(), "close": row.close}
+            for row in sorted(stocks_latest.values(), key=lambda r: r.symbol)
+        ],
+        "tefas": [
+            {"fund_code": row.fund_code, "title": row.title, "day": row.day.isoformat(), "price": row.price}
+            for row in sorted(funds_latest.values(), key=lambda r: r.fund_code)
+        ],
+        "strava_recent": [
+            {
+                "name": row.name,
+                "activity_type": row.activity_type,
+                "start_date": row.start_date.isoformat(),
+                "distance_m": row.distance_m,
+                "moving_time_s": row.moving_time_s,
+            }
+            for row in strava_rows
+        ],
+        "events": [
+            {
+                "title": row.title,
+                "link": row.link,
+                "category": row.category,
+                "published_at": row.published_at.isoformat() if row.published_at else None,
+            }
+            for row in upcoming_events
+        ],
+        "outages_today": len(outages_today),
     }
 
 
@@ -190,6 +276,16 @@ async def get_history(days: int = 30):
         currency_rows = (
             await session.execute(
                 select(CurrencyDay).where(CurrencyDay.day >= since).order_by(CurrencyDay.day)
+            )
+        ).scalars().all()
+        gold_rows = (
+            await session.execute(
+                select(GoldDay).where(GoldDay.day >= since).order_by(GoldDay.day)
+            )
+        ).scalars().all()
+        evds_rows = (
+            await session.execute(
+                select(EvdsDay).where(EvdsDay.day >= since).order_by(EvdsDay.day)
             )
         ).scalars().all()
         # Uyku evre bazlı segmentlerden toplanır; "awake" süresi uykuya sayılmaz.
@@ -272,6 +368,14 @@ async def get_history(days: int = 30):
         "currency": [
             {"day": row.day.isoformat(), "usd_try": row.usd_try, "eur_try": row.eur_try}
             for row in currency_rows
+        ],
+        "gold": [
+            {"day": row.day.isoformat(), "gram_altin_satis": row.gram_altin_satis, "ceyrek_satis": row.ceyrek_satis}
+            for row in gold_rows
+        ],
+        "evds": [
+            {"day": row.day.isoformat(), "usd_satis": row.usd_satis, "eur_satis": row.eur_satis}
+            for row in evds_rows
         ],
         "spotify": [{"day": iso(day), "plays": plays} for day, plays in spotify_rows],
         "sleep_stages": [
