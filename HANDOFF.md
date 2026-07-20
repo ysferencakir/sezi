@@ -127,7 +127,17 @@ yeniden kurma zorunluluğunu kaldırmak.
 - [ ] İleride tam otomatik güncelleme istenirse Play Store kapalı test kanalını ve
   Health Connect veri erişimi beyanlarını ayrıca değerlendir.
 
-### 3. Diğer sıradaki işler (öncelik sırasıyla)
+### 3. Veritabanı yedekleme (tek-kopya riski, 2026-07-19'da plana alındı)
+
+Veri Neon'da tek kopya — kod (GitHub) ve imza (3 kopya) güvende ama **Neon giderse veri gider**
+(hesap askıya alınması, free plan politika değişikliği, yanlışlıkla silme; free planda PITR penceresi çok kısa).
+
+**Plan:** VPS'e haftalık cron → `pg_dump` + gzip → Telegram bot'la kullanıcıya dosya olarak gönder
+(bot + chat_id `.env`'de hazır, ek servis gerekmez; DB birkaç MB). VPS'te son 8 kopya tutulur.
+Gerekenler: VPS'e `postgresql-client` kurulumu, `/root/sezi-backup.sh` + cron satırı.
+Böylece üç bacak da (kod=GitHub, veri=Neon+Telegram, imza=VPS+lokal+bulut) tek noktasız olur.
+
+### 4. Diğer sıradaki işler (öncelik sırasıyla)
 
 1. **Query/filter endpoint'leri** — "10+ toplantılı haftaları göster" tipi sorgular; PWA'ya arama sekmesi olarak eklenebilir.
 2. **Yatırım modülü** — rapora göre: altın için goldprice.dev (spot çekirdek) + ayrı prim katmanı; TEFAS için tefas-crawler + cache; BIST için Yapı Kredi API Portal.

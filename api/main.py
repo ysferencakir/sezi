@@ -5,15 +5,19 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from pydantic import BaseModel
 
-from api.routers import auth, context, dashboard, ingest
+from api.routers import auth, barcode, context, dashboard, ingest
 from core import module_loader, scheduler, telegram_bot
 from core.database import create_tables
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await create_tables()
+    # load_all() her modülün models.py'sini import ederek Base.metadata'ya kaydeder —
+    # create_tables() bundan önce çalışırsa yalnızca dashboard.py'nin doğrudan
+    # import ettiği modellerin tabloları oluşur, dashboard'a henüz bağlanmamış
+    # yeni modüllerin tabloları sessizce atlanır.
     module_loader.load_all()
+    await create_tables()
     scheduler.start()
     await telegram_bot.start()
     yield
@@ -23,6 +27,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Sezi", version="0.1.0", lifespan=lifespan)
 app.include_router(auth.router)
+app.include_router(barcode.router)
 app.include_router(context.router)
 app.include_router(dashboard.router)
 app.include_router(ingest.router)

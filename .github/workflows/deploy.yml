@@ -34,4 +34,10 @@ jobs:
             if [ -n "${{ secrets.HEALTH_INGEST_TOKEN }}" ]; then
               grep -q '^HEALTH_INGEST_TOKEN=' .env 2>/dev/null || echo "HEALTH_INGEST_TOKEN=${{ secrets.HEALTH_INGEST_TOKEN }}" >> .env
             fi
+            # Spotify OAuth ayarlari — secret'lar tanimliysa .env'de olmasini garanti et
+            if [ -n "${{ secrets.SPOTIFY_CLIENT_ID }}" ]; then
+              grep -q '^SPOTIFY_CLIENT_ID=' .env 2>/dev/null || echo "SPOTIFY_CLIENT_ID=${{ secrets.SPOTIFY_CLIENT_ID }}" >> .env
+              grep -q '^SPOTIFY_CLIENT_SECRET=' .env 2>/dev/null || echo "SPOTIFY_CLIENT_SECRET=${{ secrets.SPOTIFY_CLIENT_SECRET }}" >> .env
+              grep -q '^SPOTIFY_REDIRECT_URI=' .env 2>/dev/null || echo "SPOTIFY_REDIRECT_URI=https://sezi.ysferencakir.info.tr/auth/spotify/callback" >> .env
+            fi
             sudo systemctl restart sezi
